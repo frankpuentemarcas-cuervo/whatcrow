@@ -1,5 +1,5 @@
 use crate::db::{Db, DbError};
-use rusqlite::{params, OptionalExtension, TransactionBehavior};
+use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ActionError {

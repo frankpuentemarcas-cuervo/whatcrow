@@ -2,7 +2,7 @@
 // archivo de test, así que silenciamos los avisos de código muerto.
 #![allow(dead_code)]
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use std::path::PathBuf;
 use tempfile::TempDir;
 

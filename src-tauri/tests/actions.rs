@@ -54,7 +54,10 @@ fn send_dos_veces_no_duplica() {
     let id = f.suggestion(JUAN, "J1", "respuesta", Some("Sí"), "pending");
     let mut db = Db::open(&f.path).unwrap();
     db.send(id, "Sí", NOW).unwrap();
-    assert!(matches!(db.send(id, "Sí", NOW), Err(ActionError::NotPending)));
+    assert!(matches!(
+        db.send(id, "Sí", NOW),
+        Err(ActionError::NotPending)
+    ));
     assert_eq!(outbox(&f).len(), 1);
 }
 
@@ -64,7 +67,10 @@ fn send_rechaza_texto_vacio_y_categorias_no_enviables() {
     let r = f.suggestion(JUAN, "J1", "respuesta", Some("Sí"), "pending");
     let t = f.suggestion(ANA, "A1", "tarea", None, "pending");
     let mut db = Db::open(&f.path).unwrap();
-    assert!(matches!(db.send(r, "   ", NOW), Err(ActionError::EmptyText)));
+    assert!(matches!(
+        db.send(r, "   ", NOW),
+        Err(ActionError::EmptyText)
+    ));
     assert!(matches!(
         db.send(t, "hola", NOW),
         Err(ActionError::NotSendable)

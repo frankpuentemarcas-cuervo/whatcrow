@@ -22,12 +22,7 @@ fn snapshot_lista_pendientes_con_nombre_y_sin_newer() {
     assert_eq!(s.pending.len(), 1);
     let p = &s.pending[0];
     assert_eq!(
-        (
-            p.id,
-            p.chat_name.as_str(),
-            p.is_group,
-            p.draft.as_deref()
-        ),
+        (p.id, p.chat_name.as_str(), p.is_group, p.draft.as_deref()),
         (id, "Juan", false, Some("Sí"))
     );
     assert!(p.newer.is_none());
@@ -41,20 +36,12 @@ fn snapshot_marca_newer_solo_con_un_mensaje_entrante_posterior() {
     f.suggestion(JUAN, "J1", "respuesta", Some("Sí"), "pending");
     f.message(JUAN, "J2", true, "yo respondí algo", NOW - 60_000);
     assert!(
-        Db::open(&f.path)
-            .unwrap()
-            .snapshot(NOW)
-            .unwrap()
-            .pending[0]
+        Db::open(&f.path).unwrap().snapshot(NOW).unwrap().pending[0]
             .newer
             .is_none()
     );
     f.message(JUAN, "J3", false, "¿y entonces?", NOW - 30_000);
-    let newer = Db::open(&f.path)
-        .unwrap()
-        .snapshot(NOW)
-        .unwrap()
-        .pending[0]
+    let newer = Db::open(&f.path).unwrap().snapshot(NOW).unwrap().pending[0]
         .newer
         .clone()
         .unwrap();
@@ -81,7 +68,14 @@ fn snapshot_separa_programados_y_fallidos_recientes() {
     .unwrap();
     c.execute(
         ins,
-        rusqlite::params![JUAN, "falló", "failed", NOW - 1_000, None::<i64>, None::<i64>],
+        rusqlite::params![
+            JUAN,
+            "falló",
+            "failed",
+            NOW - 1_000,
+            None::<i64>,
+            None::<i64>
+        ],
     )
     .unwrap();
     c.execute(
@@ -118,10 +112,7 @@ fn snapshot_separa_programados_y_fallidos_recientes() {
     );
     // Orden por hora de falla: "falló" (NOW - 1 s) antes que "venció" (failed_at NOW - 60 s); "viejo" queda fuera de los 7 días.
     assert_eq!(
-        s.failed
-            .iter()
-            .map(|o| o.text.as_str())
-            .collect::<Vec<_>>(),
+        s.failed.iter().map(|o| o.text.as_str()).collect::<Vec<_>>(),
         vec!["falló", "venció"]
     );
 }

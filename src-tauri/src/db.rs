@@ -1,5 +1,5 @@
 use crate::model::*;
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, params};
 use std::path::{Path, PathBuf};
 
 pub const DAEMON_STALE_MS: i64 = 120_000;
@@ -104,7 +104,12 @@ impl Db {
         Ok(last.filter(|m| m.id != anchor))
     }
 
-    fn outbox_where(&self, cond: &str, bound: i64, order: &str) -> Result<Vec<OutboxView>, DbError> {
+    fn outbox_where(
+        &self,
+        cond: &str,
+        bound: i64,
+        order: &str,
+    ) -> Result<Vec<OutboxView>, DbError> {
         let sql = format!(
             "SELECT o.id, o.chat_jid, COALESCE(s.chat_name, c.name, o.chat_jid), o.text, o.status, o.error, o.send_at, o.created_at, o.failed_at, o.suggestion_id
              FROM outbox o LEFT JOIN suggestions s ON s.id = o.suggestion_id LEFT JOIN chats c ON c.jid = o.chat_jid
