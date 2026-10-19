@@ -1,0 +1,862 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>whatcrow · mockup v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- Mesa de pruebas (fuera de la app) ---------- */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:13px/1.45 "Atkinson Hyperlegible Next","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;background:#d6ddd8;color:#14231A}
+@media (prefers-color-scheme:dark){body{background:#070a08;color:#E4EDE7}}
+.lab{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 16px;border-bottom:1px solid #0002;background:#0000000a}
+.lab label{display:flex;gap:6px;align-items:center}
+.lab select,.lab button{font:inherit;padding:4px 8px;border-radius:4px;border:1px solid #8884;background:Canvas;color:CanvasText;cursor:pointer}
+.lab .sz{font-variant-numeric:tabular-nums;opacity:.75}
+.lab .hint{opacity:.7;font-size:12px;flex-basis:100%}
+.stage{padding:16px;display:flex;justify-content:flex-end}
+.stage.fill{padding:0}
+
+/* ---------- Ventana ---------- */
+.win{
+  --bg:#EDF2EE;--surface:#FFFFFF;--surface-2:#F3F7F4;--ink:#14231A;--muted:#4F6156;--line:#D3DED6;
+  --accent:#17643F;--accent-ink:#FFFFFF;--accent-soft:#DDEFE3;
+  --resp:#1F5FAF;--task:#8A3A87;--task-soft:#F7E8F6;--wait:#5B6470;--wait-soft:#EDEFF2;
+  --warn:#8A5300;--warn-soft:#FFF3DA;--stale:#A3470A;--stale-soft:#FFF0E3;--err:#B42318;--err-soft:#FDECEA;--ok:#1E7A3C;
+  --sb-thumb:#6E8576;
+  --shadow:0 8px 24px rgba(15,35,24,.18);
+  container:win / size;
+  width:330px;height:660px;min-width:300px;min-height:48px;
+  resize:both;overflow:hidden;position:relative;
+  border-radius:8px;border:1px solid var(--line);
+  background:var(--bg);color:var(--ink);
+  box-shadow:0 12px 40px rgba(0,0,0,.25);
+  font:13px/1.46 "Atkinson Hyperlegible Next","Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+}
+.win[data-theme=dark]{
+  --bg:#0F1512;--surface:#17201B;--surface-2:#1F2A24;--ink:#E4EDE7;--muted:#98AA9F;--line:#2D3B33;
+  --accent:#74D69C;--accent-ink:#0C1A12;--accent-soft:#1E3A2A;
+  --resp:#8DB8FF;--task:#E39BE0;--task-soft:#3A2139;--wait:#A9B1BC;--wait-soft:#262C33;
+  --warn:#F2C46B;--warn-soft:#3A2F17;--stale:#FFB27A;--stale-soft:#3D2616;--err:#FF8F84;--err-soft:#3F1C1A;--ok:#6FD39A;
+  --sb-thumb:#6C8274;
+  --shadow:0 8px 24px rgba(0,0,0,.5);
+}
+@media (prefers-color-scheme:dark){
+  .win:not([data-theme=light]){
+    --bg:#0F1512;--surface:#17201B;--surface-2:#1F2A24;--ink:#E4EDE7;--muted:#98AA9F;--line:#2D3B33;
+    --accent:#74D69C;--accent-ink:#0C1A12;--accent-soft:#1E3A2A;
+    --resp:#8DB8FF;--task:#E39BE0;--task-soft:#3A2139;--wait:#A9B1BC;--wait-soft:#262C33;
+    --warn:#F2C46B;--warn-soft:#3A2F17;--stale:#FFB27A;--stale-soft:#3D2616;--err:#FF8F84;--err-soft:#3F1C1A;--ok:#6FD39A;
+    --sb-thumb:#6C8274;
+    --shadow:0 8px 24px rgba(0,0,0,.5);
+  }
+}
+.stage.fill .win{width:100vw!important;height:calc(100vh - 90px)!important;border-radius:0;resize:none}
+
+.win button,.win input,.win textarea,.win select{font:inherit;color:inherit}
+.win :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- Barras de scroll ----------
+   Un solo contenedor con scroll por columna. El gutter se reserva siempre
+   (WebView2 en Windows usa barras clásicas de 15–17 px; con "thin", ~11 px). */
+.win .col,.win .sheet,.win .c-draft{scrollbar-gutter:stable;overscroll-behavior:contain}
+@supports (scrollbar-color:auto){
+  .win .col,.win .sheet,.win .c-draft,.win .tabs,.win .filters{scrollbar-width:thin;scrollbar-color:var(--sb-thumb) transparent}
+}
+/* Respaldo para WebView2 antiguos (Chromium < 121) */
+.win ::-webkit-scrollbar{width:10px;height:10px}
+.win ::-webkit-scrollbar-track{background:transparent}
+.win ::-webkit-scrollbar-thumb{background:var(--sb-thumb);border-radius:5px;border:2px solid transparent;background-clip:padding-box}
+.win ::-webkit-scrollbar-thumb:hover{background:var(--accent);background-clip:padding-box}
+
+.app{display:grid;grid-template-rows:auto auto auto 1fr auto;height:100%;position:relative}
+
+/* Barra de título */
+.title{display:flex;align-items:center;gap:6px;height:40px;padding:0 4px 0 10px;border-bottom:1px solid var(--line);background:var(--surface);user-select:none;position:relative}
+.brand{display:flex;align-items:center;gap:6px;font-weight:700;font-size:14px;letter-spacing:-.01em}
+.brand svg{width:20px;height:20px;color:var(--accent)}
+.health{width:8px;height:8px;border-radius:50%;background:var(--ok);display:none}
+.health.warn{background:var(--warn)}.health.bad{background:var(--err)}
+.title .grow{flex:1}
+.ib{width:32px;height:32px;display:grid;place-items:center;border:0;background:transparent;border-radius:4px;cursor:pointer;position:relative;color:var(--muted);flex:none}
+.ib:hover{background:var(--surface-2);color:var(--ink)}
+.ib svg{width:16px;height:16px}
+.ib .dot{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--accent);border:1.5px solid var(--surface)}
+.seg{display:none;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:0 9px;height:26px;cursor:pointer;color:var(--muted);font-size:12px}
+.seg button[aria-pressed=true]{background:var(--accent-soft);color:var(--ink);font-weight:500}
+.seg button+button{border-left:1px solid var(--line)}
+.menu{position:absolute;top:38px;right:70px;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:4px;min-width:200px}
+.menu[hidden]{display:none}
+.menu button{display:flex;width:100%;justify-content:space-between;gap:12px;border:0;background:transparent;padding:7px 8px;border-radius:4px;cursor:pointer;text-align:left}
+.menu button:hover{background:var(--surface-2)}
+.menu small{color:var(--muted)}
+kbd{font:500 11px/1 inherit;padding:2px 4px;border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;color:var(--muted);background:var(--surface-2)}
+
+/* Banners */
+.banners:empty{display:none}
+.banner{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;padding:8px 10px;border-bottom:1px solid var(--line);font-size:12px}
+.banner svg{width:16px;height:16px;margin-top:1px}
+.banner p{margin:0}
+.banner strong{font-size:13px}
+.banner .acts{grid-column:2;display:flex;gap:6px;margin-top:4px}
+.banner.err{background:var(--err-soft)}.banner.err svg{color:var(--err)}
+.banner.warn{background:var(--warn-soft)}.banner.warn svg{color:var(--warn)}
+.banner details{grid-column:2;color:var(--muted)}
+.banner summary{cursor:pointer;color:var(--ink);text-decoration:underline;text-underline-offset:2px}
+.banner-more{display:none;padding:4px 10px;font-size:12px;background:var(--warn-soft);border-bottom:1px solid var(--line)}
+
+/* Pestañas y filtros */
+.tabs{display:flex;gap:2px;padding:6px 8px 0;background:var(--bg);border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{border:0;background:transparent;padding:6px 8px 7px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;font-weight:500;white-space:nowrap;flex:none}
+.tab[aria-selected=true]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab .c{font-variant-numeric:tabular-nums;margin-left:3px;padding:0 5px;border-radius:8px;background:var(--surface-2);font-size:12px}
+.tab .c.bad{background:var(--err);color:var(--surface)}
+.filters{display:none;gap:4px;padding:6px 8px;overflow-x:auto}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:2px 9px;cursor:pointer;font-size:12px;white-space:nowrap}
+.chip[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft);font-weight:500}
+
+/* Paneles: cada columna es el ÚNICO contenedor con scroll */
+.panes{display:grid;grid-template-columns:minmax(0,1fr);min-height:0;position:relative}
+.col{min-height:0;overflow-y:auto;overflow-x:hidden;scroll-padding:8px 0 56px}
+.col-list{padding:8px 8px 56px 8px}
+.col-detail,.col-side{display:none}
+.list{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+
+/* Tarjeta: es contenedor de su propio ancho (la fila de acciones depende de él) */
+.card{container:card / inline-size;position:relative;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px 10px 14px;scroll-margin:8px 0 56px}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:6px 0 0 6px;background:var(--resp)}
+.card.cat-tarea{background:var(--surface-2)}.card.cat-tarea::before{background:var(--task)}
+.card.cat-esperando{background:var(--surface-2)}.card.cat-esperando::before{background:var(--wait)}
+.card.is-stale::before{background:var(--stale)}
+.card:focus-visible{outline-offset:1px}
+.c-head{display:flex;align-items:center;gap:6px;cursor:pointer;min-height:24px}
+.c-name{font-weight:700;font-size:14px;line-height:18px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-name svg{width:13px;height:13px;vertical-align:-1px;margin-right:3px;color:var(--muted)}
+.c-cat{font-size:12px;font-weight:500;color:var(--resp);white-space:nowrap;flex:none}
+.cat-tarea .c-cat{color:var(--task)}.cat-esperando .c-cat{color:var(--wait)}
+.c-id{flex:none;height:24px;min-width:24px;padding:0 5px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--muted);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums;cursor:copy;line-height:22px}
+.c-id:hover{border-color:var(--muted);color:var(--ink)}
+.c-id.fresh{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.c-time{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;flex:none}
+.c-replaced{margin:2px 0 0;font-size:12px;color:var(--accent);font-weight:500}
+.c-last{margin:3px 0 0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.c-last .who{color:var(--ink);font-weight:500}
+.c-preview{display:none;margin:2px 0 0;font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-preview .lbl{color:var(--muted)}
+.c-body{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.c-note{margin:0;font-size:12px;color:var(--muted);display:flex;gap:5px;align-items:flex-start}
+.c-note svg{width:13px;height:13px;flex:none;margin-top:2px}
+.c-note.nofile{color:var(--warn)}
+.c-stale{background:var(--stale-soft);border-radius:4px;padding:6px 8px;font-size:12px}
+.c-stale strong{color:var(--stale)}
+.c-stale p{margin:2px 0;color:var(--ink);font-size:13px}
+.c-stale.flash{animation:flash .5s 2}
+@keyframes flash{50%{outline:2px solid var(--stale)}}
+.c-conflict{background:var(--accent-soft);border-radius:4px;padding:6px 8px;font-size:12px}
+.c-conflict .acts{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.c-conflict blockquote{margin:6px 0 0;padding:6px 8px;background:var(--surface);border-radius:4px;font-size:13px;color:var(--ink)}
+.linkbtn{border:0;background:none;padding:0;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:12px}
+/* Borrador: crece con el texto hasta un tope; recién ahí scrollea (con overscroll contenido) */
+.c-draftwrap{position:relative}
+.c-draft{display:block;width:100%;resize:none;border:1px solid var(--muted);border-radius:4px;background:var(--surface-2);padding:6px 8px 22px;line-height:19px;min-height:52px;max-height:calc(19px*5 + 28px);overflow-y:auto}
+.c-draft:focus{border-color:var(--accent);background:var(--surface);outline:1px solid var(--accent);outline-offset:0}
+.c-draft[readonly]{opacity:.7}
+.c-edited{position:absolute;right:20px;bottom:4px;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;background:inherit;pointer-events:none}
+.c-edited .linkbtn{pointer-events:auto}
+.c-err{background:var(--err-soft);border-radius:4px;padding:6px 8px;font-size:12px;display:flex;gap:8px;justify-content:space-between;align-items:flex-start}
+.c-err strong{color:var(--err)}
+
+/* Fila de acciones: Enviar en un slot fijo al borde derecho */
+.c-actions{display:flex;align-items:center;gap:6px;min-height:32px}
+.c-actions .spacer{flex:1;min-width:0}
+.btn{height:32px;padding:0 8px;border-radius:4px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none}
+.btn:hover{border-color:var(--muted)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--muted)}
+.btn.ghost:hover{color:var(--ink);background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.warn{border:1.5px solid var(--stale);color:var(--stale);background:var(--surface);font-weight:700}
+.btn.slot{width:108px}
+.btn.sm{height:26px;font-size:12px}
+.btn[aria-disabled=true]{opacity:.45;cursor:not-allowed;filter:none}
+.btn .ico{display:none;width:16px;height:16px}
+@container card (max-width:339px){
+  .btn.sched{width:32px;padding:0}
+  .btn.sched .ico{display:block}
+  .btn.sched .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+}
+.c-sending{position:relative;display:flex;align-items:center;gap:6px;height:32px;border-radius:4px;background:var(--accent-soft);overflow:hidden}
+.c-sending .bar{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);width:100%;transform-origin:left;animation:drain 5s linear forwards}
+@keyframes drain{to{transform:scaleX(0)}}
+.c-sending span{flex:1;min-width:0;padding-left:10px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-sending b{font-variant-numeric:tabular-nums}
+.c-sched{display:flex;flex-direction:column;gap:6px;border-top:1px dashed var(--line);padding-top:6px}
+.c-sched .chips{display:flex;flex-wrap:wrap;gap:4px}
+.c-sched .row{display:flex;flex-wrap:wrap;gap:6px}
+.c-sched label{display:flex;flex-direction:column;font-size:12px;color:var(--muted);flex:1 1 120px;min-width:0}
+.c-sched input{height:30px;border:1px solid var(--muted);border-radius:4px;background:var(--surface);padding:0 6px;min-width:0;width:100%}
+.c-sched .hint{margin:0;font-size:12px;color:var(--muted)}
+.c-sched .when{margin:0;font-weight:700}
+.card.leaving{animation:leave .16s ease-in forwards}
+@keyframes leave{to{opacity:0;transform:translateX(12px)}}
+
+/* Skeleton / vacío / error */
+.skel{height:132px;border-radius:6px;background:linear-gradient(90deg,var(--surface) 0,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:sk 1.4s infinite linear;border:1px solid var(--line)}
+@keyframes sk{to{background-position:-200% 0}}
+.empty{padding:28px 12px;color:var(--muted)}
+.empty h2{margin:0 0 4px;font-size:16px;color:var(--ink)}
+.empty p{margin:0 0 10px}
+.empty svg{width:28px;height:28px;color:var(--muted);margin-bottom:8px}
+.empty .path{font-size:12px;background:var(--surface-2);padding:6px 8px;border-radius:4px;user-select:all;word-break:break-all;color:var(--ink)}
+.empty .acts{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Programados y fallidos */
+.sec-h{font-size:13px;font-weight:700;margin:4px 2px 6px;display:flex;justify-content:space-between}
+.row-item{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.row-item .t{display:flex;gap:6px;align-items:baseline}
+.row-item .t b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-item .t span{font-size:12px;color:var(--muted);white-space:nowrap}
+.row-item p{margin:0;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.row-item .why{color:var(--err);font-size:12px}
+.row-item .acts{display:flex;justify-content:flex-end}
+.row-item.failed{background:var(--err-soft);border-color:transparent}
+
+/* Barra de estado */
+.status{display:flex;align-items:center;gap:12px;height:26px;padding:0 10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);background:var(--surface);white-space:nowrap;overflow:hidden}
+.status .s{display:flex;align-items:center;gap:5px}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block}
+.status i.warn{background:var(--warn)}.status i.bad{background:var(--err)}
+.status .grow{flex:1}
+
+/* Toast (nunca encima del detalle: en lista+detalle va sobre la lista) */
+.toast{position:absolute;left:8px;right:8px;bottom:34px;z-index:20;background:var(--ink);color:var(--surface);border-radius:6px;padding:8px 8px 8px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);font-size:13px}
+.toast[hidden]{display:none}
+.toast span{flex:1}
+.toast button{border:0;background:transparent;color:var(--surface);font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:4px 6px;border-radius:4px}
+.toast button:focus-visible{outline-color:var(--surface)}
+
+/* Ajustes */
+.sheet{position:absolute;inset:40px 0 0 0;z-index:25;background:var(--surface);overflow-y:auto;padding:12px 14px 24px;border-top:1px solid var(--line)}
+.sheet[hidden]{display:none}
+.sheet h2{font-size:16px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center}
+.sheet h3{font-size:13px;margin:16px 0 6px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field .row{display:flex;gap:6px}
+.field input[type=text]{flex:1;min-width:0;height:32px;border:1px solid var(--muted);border-radius:4px;background:var(--surface-2);padding:0 8px;font-size:12px}
+.msg-ok{color:var(--ok);font-size:12px}.msg-err{color:var(--err);font-size:12px}
+.switch{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.switch button{width:40px;height:22px;border-radius:11px;border:1px solid var(--muted);background:var(--surface-2);position:relative;cursor:pointer;flex:none}
+.switch button::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:left .12s}
+.switch button[aria-checked=true]{background:var(--accent);border-color:var(--accent)}
+.switch button[aria-checked=true]::after{left:21px;background:var(--accent-ink)}
+.upd{background:var(--surface-2);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.upd p{margin:0}
+.upd .meta{font-size:12px;color:var(--muted)}
+.prog{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.prog div{height:100%;background:var(--accent);width:0}
+.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:12px;margin:0}
+.keys dt{white-space:nowrap}.keys dd{margin:0;color:var(--muted)}
+.spin{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rot .8s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* Contador */
+.counter{display:none;height:100%;align-items:center;gap:8px;padding:0 12px;cursor:pointer;border:0;background:var(--surface);width:100%;border-radius:24px;text-align:left}
+.counter svg{width:20px;height:20px;color:var(--accent)}
+.counter .n{font-size:22px;line-height:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.counter .l{font-size:12px;color:var(--muted);line-height:1.1}
+.counter .f{color:var(--err);font-weight:700;font-size:12px}
+.counter .health{display:block;margin-left:auto}
+
+/* ================= Breakpoints de la ventana ================= */
+@container win (max-width:379px){
+  .tab{padding:6px 5px 7px;font-size:12px}
+  .tab .c{padding:0 4px}
+}
+@container win (min-width:380px){ .filters{display:flex} }
+@container win (min-width:480px){ .seg{display:flex} #sizeBtn{display:none} }
+/* Lista + detalle */
+@container win (min-width:600px){
+  .panes{grid-template-columns:280px minmax(0,1fr)}
+  .col-list{border-right:1px solid var(--line)}
+  .col-detail{display:block;padding:16px 12px 16px 12px;background:var(--surface)}
+  .col-list .card{cursor:pointer;padding:8px 10px 8px 13px}
+  .col-list .card .c-body{display:none}
+  .col-list .card .c-last{-webkit-line-clamp:1}
+  .col-list .card .c-preview{display:block}
+  .col-list .card.is-sel{background:var(--accent-soft);border-color:var(--accent)}
+  .col-detail .card{border:0;padding:0 0 0 14px;background:transparent;scroll-margin:0}
+  .col-detail .card .c-name{font-size:16px;line-height:22px;white-space:normal}
+  .col-detail .card .c-last{-webkit-line-clamp:unset;font-size:13px;margin-top:6px}
+  .col-detail .c-draft{max-height:min(320px,45cqh);min-height:120px}
+  .col-detail .c-body{gap:10px;margin-top:10px}
+  /* Acciones pegadas abajo del panel de detalle */
+  .col-detail .c-actions,.col-detail .c-sending{position:sticky;bottom:0;z-index:2}
+  .col-detail .c-actions{background:var(--surface);padding:8px 0;box-shadow:0 -1px 0 var(--line)}
+  .col-detail .c-sending{box-shadow:0 0 0 8px var(--surface)}
+  .sheet{left:auto;width:340px;border-left:1px solid var(--line);box-shadow:var(--shadow)}
+  .toast{right:auto;width:264px}
+}
+/* Tres columnas */
+@container win (min-width:960px){
+  .panes{grid-template-columns:300px minmax(0,1fr) 300px}
+  .col-detail{padding:16px 16px}
+  .col-side{display:flex;flex-direction:column;gap:14px;padding:10px 8px 56px;border-left:1px solid var(--line)}
+  .tab[data-tab=sched],.tab[data-tab=failed]{display:none}
+  .toast{width:284px}
+}
+@container win (min-height:800px) and (max-width:599px){
+  .c-draft{max-height:calc(19px*12 + 28px)}
+  .c-last{-webkit-line-clamp:unset}
+}
+/* Alto bajo: acordeón */
+@container win (max-height:479px){
+  .title{height:36px}
+  .health{display:block}
+  .status{display:none}
+  .ib{width:28px;height:28px}
+  .btn,.c-sending{height:28px}
+  .c-actions{min-height:28px}
+  .toast{bottom:8px}
+  .sheet{top:36px}
+  .col{scroll-padding:6px 0 48px}
+  .banner:not(:first-child){display:none}
+  .banner .acts,.banner details{display:none}
+  .banner-more{display:block}
+  .tabs{padding-top:2px}.tab{padding-top:4px;padding-bottom:5px}
+  .filters{display:none}
+  .col-list .card{padding:6px 10px 6px 13px}
+  .col-list .card:not(.open) .c-body{display:none}
+  .col-list .card:not(.open) .c-last{-webkit-line-clamp:1}
+  .col-list .card.open{border-color:var(--accent)}
+  .card .c-draft{max-height:calc(19px*3 + 28px)}
+}
+@container win (max-height:90px){ .app{display:none} .counter{display:flex} }
+.win.is-counter{border-radius:24px;resize:none}
+
+@media (prefers-reduced-motion:reduce){
+  .c-sending .bar,.skel,.card.leaving,.c-stale.flash,.spin{animation:none}
+  .c-sending .bar{display:none}
+}
+@media (forced-colors:active){
+  .card::before{background:none;border-left:3px solid CanvasText}
+  .win :focus-visible{outline-color:Highlight}
+}
+</style>
+</head>
+<body>
+
+<div class="lab" role="region" aria-label="Controles del mockup (no son parte de la app)">
+  <label>Escenario
+    <select id="scenario">
+      <option value="normal">Normal (todos los estados de tarjeta)</option>
+      <option value="empty">Vacío</option>
+      <option value="loading">Cargando</option>
+      <option value="nodb">Sin base de datos</option>
+      <option value="daemon">WhatsApp no saludable</option>
+      <option value="agent">Agente sin señales &gt; 20 min</option>
+      <option value="stale">Datos desactualizados (lectura falla)</option>
+      <option value="all">Todos los avisos juntos</option>
+    </select>
+  </label>
+  <label>Tema
+    <select id="theme"><option value="system">Sistema</option><option value="light">Claro</option><option value="dark">Oscuro</option></select>
+  </label>
+  <span>Tamaño:
+    <button data-preset="counter">Contador</button>
+    <button data-preset="min">300×360</button>
+    <button data-preset="compact">Compacto</button>
+    <button data-preset="normal">Normal</button>
+    <button data-preset="w380">380×660</button>
+    <button data-preset="wide600">600×660</button>
+    <button data-preset="wide">Amplio</button>
+    <button data-preset="huge">960×800</button>
+    <button id="fill">Llenar ventana</button>
+  </span>
+  <span class="sz num" id="sz">330 × 660</span>
+  <span>Simular:
+    <button id="simNew">Sugerencia nueva mientras edito (Rosa)</button>
+    <button id="simRepl">Reemplazo sin edición (Compras Andina)</button>
+    <button id="simMsg">Mensaje nuevo (Hugo)</button>
+  </span>
+  <label>Resultado de "Buscar actualizaciones"
+    <select id="updRes"><option value="avail">Hay versión nueva</option><option value="ok">Al día</option><option value="err">Error</option></select>
+  </label>
+  <span class="hint">Arrastra la esquina inferior derecha para redimensionar. Breakpoints por container queries (ventana y tarjeta). Prueba Enviar en "Diego Salazar" (desactualizada) y en "Rosa Quispe": Enviar, Enviar igual, Deshacer y Programar ocupan el mismo rectángulo.</span>
+</div>
+
+<div class="stage" id="stage">
+  <div class="win" id="win" data-theme="system">
+    <button class="counter" id="counter" aria-label="whatcrow: 9 por aprobar, 2 fallidos. Abrir">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crow"/></svg>
+      <span class="n" id="cN">9</span><span class="l">por<br>aprobar</span>
+      <span class="f" id="cF">2 fallidos</span>
+      <span class="health" id="cH" aria-hidden="true"></span>
+    </button>
+
+    <div class="app" id="app">
+      <header class="title" data-tauri-drag-region>
+        <span class="brand"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crow"/></svg>whatcrow</span>
+        <span class="health" id="health" role="img" aria-label="Todo funciona"></span>
+        <span class="grow"></span>
+        <div class="seg" role="group" aria-label="Tamaño de la ventana">
+          <button data-preset="compact" aria-pressed="false" title="Compacto (Ctrl+1)">Compacto</button>
+          <button data-preset="normal" aria-pressed="true" title="Normal (Ctrl+2)">Normal</button>
+          <button data-preset="wide" aria-pressed="false" title="Amplio (Ctrl+3)">Amplio</button>
+        </div>
+        <button class="ib" id="sizeBtn" aria-haspopup="menu" aria-expanded="false" title="Tamaño de la ventana" aria-label="Tamaño de la ventana">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11" rx="1.5"/><path d="M9 5h2v2M7 11H5V9"/></svg>
+        </button>
+        <button class="ib" id="setBtn" title="Ajustes (Ctrl+,)" aria-label="Ajustes">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>
+          <span class="dot" id="updDot" hidden></span>
+        </button>
+        <button class="ib" data-preset="counter" title="Contraer a contador (Ctrl+0)" aria-label="Contraer a contador">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10"/></svg>
+        </button>
+        <button class="ib" title="Ocultar en la bandeja" aria-label="Ocultar en la bandeja">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+        <div class="menu" id="sizeMenu" role="menu" hidden>
+          <button role="menuitem" data-preset="counter">Contador <small>Ctrl+0</small></button>
+          <button role="menuitem" data-preset="compact">Compacto · 330×440 <small>Ctrl+1</small></button>
+          <button role="menuitem" data-preset="normal">Normal · 330×660 <small>Ctrl+2</small></button>
+          <button role="menuitem" data-preset="wide">Amplio · 760×660 <small>Ctrl+3</small></button>
+        </div>
+      </header>
+
+      <div><div class="banners" id="banners"></div><div class="banner-more" id="bannerMore"></div></div>
+
+      <div>
+        <div class="tabs" role="tablist" aria-label="Secciones">
+          <button class="tab" role="tab" data-tab="pending" aria-selected="true">Pendientes<span class="c" id="tP">9</span></button>
+          <button class="tab" role="tab" data-tab="sched" aria-selected="false">Programados<span class="c" id="tS">2</span></button>
+          <button class="tab" role="tab" data-tab="failed" aria-selected="false">Fallidos<span class="c bad" id="tF">2</span></button>
+        </div>
+        <div class="filters" id="filters" role="group" aria-label="Filtrar por categoría"></div>
+      </div>
+
+      <main class="panes">
+        <section class="col col-list" id="colList" aria-label="Lista"></section>
+        <section class="col col-detail" id="colDetail" aria-label="Detalle"></section>
+        <aside class="col col-side" id="colSide" aria-label="Programados y fallidos"></aside>
+      </main>
+
+      <footer class="status" id="status"></footer>
+
+      <div class="toast" id="toast" role="status" hidden><span id="toastMsg"></span><button id="toastUndo">Deshacer</button></div>
+
+      <section class="sheet" id="sheet" hidden aria-label="Ajustes">
+        <h2>Ajustes <button class="ib" id="sheetClose" aria-label="Cerrar ajustes" title="Cerrar (Esc)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></h2>
+        <div class="field">
+          <label for="dbPath"><b>Base de datos</b></label>
+          <div class="row"><input type="text" id="dbPath" value="C:\dev\whatsapp\data\wa.sqlite"><button class="btn">Examinar…</button></div>
+          <span class="msg-ok">Base encontrada.</span>
+        </div>
+        <h3>Inicio</h3>
+        <div class="switch"><span id="lblStart">Iniciar con Windows</span><button role="switch" aria-checked="true" aria-labelledby="lblStart" id="swStart"></button></div>
+        <h3>Tema</h3>
+        <div class="seg" style="display:flex;width:max-content" role="group" aria-label="Tema">
+          <button aria-pressed="true" data-th="system">Sistema</button><button aria-pressed="false" data-th="light">Claro</button><button aria-pressed="false" data-th="dark">Oscuro</button>
+        </div>
+        <h3>Actualizaciones</h3>
+        <div class="upd" id="upd"></div>
+        <h3>Atajos de teclado</h3>
+        <dl class="keys">
+          <dt><kbd>↑</kbd> <kbd>↓</kbd> / <kbd>K</kbd> <kbd>J</kbd></dt><dd>Tarjeta anterior / siguiente</dd>
+          <dt><kbd>Enter</kbd> / <kbd>E</kbd></dt><dd>Abrir tarjeta / ir al borrador</dd>
+          <dt><kbd>C</kbd></dt><dd>Copiar el id (#147)</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Enviar (5 s para deshacer)</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>Enviar igual (desactualizada)</dd>
+          <dt><kbd>Esc</kbd> / <kbd>Ctrl</kbd>+<kbd>Z</kbd></dt><dd>Deshacer envío o descarte</dd>
+          <dt><kbd>P</kbd></dt><dd>Programar</dd>
+          <dt><kbd>D</kbd> / <kbd>Supr</kbd></dt><dd>Descartar</dd>
+          <dt><kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>3</kbd></dt><dd>Pendientes / Programados / Fallidos</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>0</kbd>…<kbd>3</kbd></dt><dd>Contador / Compacto / Normal / Amplio</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>,</kbd></dt><dd>Ajustes</dd>
+        </dl>
+        <p style="color:var(--muted);font-size:12px;margin-top:16px">whatcrow 0.3.1</p>
+      </section>
+
+      <div class="sr-only" aria-live="polite" id="live"></div>
+    </div>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="crow" viewBox="0 0 24 24"><path fill="currentColor" d="M2 13.5c1.6-.3 3-1.1 4.3-2.4C8.4 8.9 10.6 7 13.6 7c1.4 0 2.5.5 3.3 1.3l1.2-.3c.9-.2 1.9 0 2.6.5l1.3.9-2.3.6c-.3.1-.5.3-.5.6 0 3.6-2.9 6.4-6.6 6.4h-1.1l1.5 3.5h-1.6l-1.6-3.4-1.4.2 1.2 3.2H8l-1.3-3c-1.8.1-3.4-.4-4.7-1.4L2 13.5zm15.2-4a.7.7 0 1 0 0-1.4.7.7 0 0 0 0 1.4z"/></symbol>
+  <symbol id="i-group" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5.5" r="2.3"/><path d="M1.8 13c.5-2.2 2.2-3.4 4.2-3.4s3.7 1.2 4.2 3.4"/><path d="M10.5 3.6a2.2 2.2 0 0 1 0 4.1M12 9.9c1.2.5 2 1.6 2.3 3.1"/></g></symbol>
+  <symbol id="i-info" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M8 7.2V11M8 5v.2"/></g></symbol>
+  <symbol id="i-warn" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.8l6.5 11.5h-13z" stroke-linejoin="round"/><path d="M8 6.2v3.3M8 11.3v.2"/></g></symbol>
+  <symbol id="i-db" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.3"><ellipse cx="8" cy="3.8" rx="5" ry="1.9"/><path d="M3 3.8v8.4c0 1 2.2 1.9 5 1.9s5-.9 5-1.9V3.8M3 8c0 1 2.2 1.9 5 1.9s5-.9 5-1.9"/></g></symbol>
+  <symbol id="i-clock" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><path d="M8 4.5V8l2.5 1.5"/></g></symbol>
+</svg>
+
+<script>
+const $ = s => document.querySelector(s);
+const win = $('#win'), stage = $('#stage');
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- Datos inventados ---------- */
+const seed = () => [
+  {id:147,chat:'Rosa Quispe',time:'10:42',cat:'respuesta',who:'',last:'¿Me confirmas si el pedido de 40 cajas sale mañana? El transportista pasa a las 8.',note:null,draft:'Hola Rosa, sí sale mañana. Lo dejamos listo desde las 7:30 para que el transportista no espere.'},
+  {id:146,chat:'Compras Andina',group:true,time:'10:37',cat:'respuesta',who:'Lucía Paredes',last:'@Erick ¿aprobamos la cotización de Ferretera Huallaga o esperamos la segunda?',note:'Te mencionaron. No sé el monto tope aprobado para esta compra.',draft:'Esperemos la segunda hasta el miércoles. Si no llega, vamos con Huallaga.'},
+  {id:145,chat:'Diego Salazar',time:'10:21',cat:'respuesta',who:'',last:'¿Puedes revisar el contrato de alquiler hoy? Necesito tu visto bueno.',newer:{time:'10:51',text:'Ya no hace falta, lo revisó Ana. Gracias igual.'},note:null,draft:'Hola Diego, lo reviso a las 4 y te aviso.'},
+  {id:141,chat:'Mariela Torres Villanueva de Zevallos',time:'10:15',cat:'respuesta',who:'',last:'Buenas tardes, ¿usted es el encargado de las vacantes de almacén?',note:'Sin ficha, contexto limitado. No sé si es candidata o proveedora.',nofile:true,draft:'Buenas tardes, sí. ¿Me cuenta a qué puesto postula?'},
+  {id:139,chat:'Javier Ccori',time:'09:58',cat:'tarea',who:'',last:'Mándame el reporte de mermas de septiembre cuando puedas.',note:'Preparar el reporte de mermas de septiembre. La respuesta espera a que lo tengas.'},
+  {id:138,chat:'Carla Benítez',time:'09:44',cat:'respuesta',who:'',last:'¿Mañana podemos ver lo del inventario a las 3?',note:'Compromete un horario: confirma tu disponibilidad.',draft:'A las 3 no puedo, ¿te parece a las 4:30?',edited:'A las 3 no llego, ¿te va a las 5? Llevo el conteo impreso para revisarlo juntos.\n\nSi se complica, lo vemos el jueves temprano.\nTambién puedo pasar por el almacén antes de las 9.\nAvísame qué te acomoda más.',conflict:{id:152,time:'10:55',draft:'Hola Carla, mañana a las 3 tengo reunión. ¿Puede ser a las 4:30 en el almacén?'}},
+  {id:136,chat:'Logística Norte',group:true,time:'09:30',cat:'esperando',who:'Tú',last:'Quedo atento a la guía de remisión.',note:'Esperando a Paolo Gutiérrez con la guía desde ayer a las 17:10.'},
+  {id:134,chat:'Ana Lucía Rojas',time:'09:12',cat:'respuesta',who:'',last:'¿Te llegó la factura corregida?',note:null,draft:'Sí, ya me llegó. Gracias, Ana Lucía.',err:true},
+  {id:131,chat:'Hugo Mendoza',time:'08:50',cat:'respuesta',who:'',last:'¿Seguimos con la visita a planta el jueves?',note:null,draft:''},
+];
+const seedSched = () => [
+  {id:201,chat:'Tomás Arce',text:'Te confirmo la reunión del jueves a las 10 en la oficina de Surquillo.',when:'mar 20 oct, 09:00'},
+  {id:202,chat:'Proveedores Textil Sur',group:true,text:'Recibido, lo revisamos el lunes con el equipo.',when:'lun 26 oct, 08:30'},
+];
+const seedFailed = () => [
+  {id:301,chat:'Patricia Vela',text:'Buen día Patricia, adjunto en un rato el cronograma.',why:'Vencido: a las 08:00 WhatsApp estaba desconectado y pasaron más de 30 min.'},
+  {id:302,chat:'Taller Rímac',group:true,text:'Listo, el repuesto llega el martes.',why:'WhatsApp rechazó el envío: ya no eres participante de este grupo.'},
+];
+
+let S = {items:seed(),sched:seedSched(),failed:seedFailed(),tab:'pending',filter:'all',sel:147,open:147,scenario:'normal'};
+S.items.forEach(i=>{i.text = i.edited ?? i.draft ?? ''; i.phase='idle';});
+const timers = {};
+let lastUndo = null;
+
+/* ---------- Render ---------- */
+const catLabel = {respuesta:'Responder',tarea:'Tarea',esperando:'Esperando'};
+const icon = id => `<svg aria-hidden="true"><use href="#${id}"/></svg>`;
+const blocked = () => ['stale','nodb','all'].includes(S.scenario);
+const visibleItems = () => S.items.filter(i=>i.phase!=='gone' && (S.filter==='all'||i.cat===S.filter));
+
+function cardHTML(i, where){
+  const resp = i.cat==='respuesta', stale = !!i.newer;
+  const did = `${where}-${i.id}`, dis = blocked(), empty = resp && !i.text.trim();
+  let body = '';
+  if (stale) body += `<div class="c-stale" role="note"><strong>Mensaje nuevo · ${i.newer.time}</strong><p>${esc(i.newer.text)}</p><span>El borrador no lo contempla.</span></div>`;
+  if (i.note) body += `<p class="c-note ${i.nofile?'nofile':''}">${icon(i.nofile?'i-warn':'i-info')}<span>${esc(i.note)}</span></p>`;
+  if (i.conflict) body += `<div class="c-conflict" role="status"><b>Hay una sugerencia nueva (${i.conflict.time}).</b> Tu texto no se tocó.
+      <div class="acts"><button class="btn sm" data-act="cf-view">${i.cfView?'Ocultar':'Ver'}</button><button class="btn sm" data-act="cf-use">Usar la nueva</button><button class="btn sm ghost" data-act="cf-keep">Seguir con la mía</button></div>
+      ${i.cfView?`<blockquote>${esc(i.conflict.draft)}</blockquote>`:''}</div>`;
+  if (resp){
+    body += `<div class="c-draftwrap"><label class="sr-only" for="d-${did}">Borrador para ${esc(i.chat)}</label><textarea class="c-draft" id="d-${did}" data-draft rows="2" ${i.phase==='sending'?'readonly':''} placeholder="Escribe un mensaje para enviar">${esc(i.text)}</textarea>
+      ${i.text!==i.draft?`<span class="c-edited">Editado <button class="linkbtn" data-act="restore">Restaurar</button></span>`:''}</div>`;
+  }
+  if (i.err) body += `<div class="c-err" role="alert"><span><strong>No se envió.</strong> Esta sugerencia ya se había enviado o fue reemplazada.</span><button class="btn sm" data-act="err-close">Cerrar</button></div>`;
+  if (i.phase==='schedule') body += schedHTML(i);
+  else if (i.phase==='sending') body += `<div class="c-sending"><span>Enviando a ${esc(i.chat)} en <b class="cd">${i.left??5}</b> s</span><button class="btn slot" data-act="undo" title="Deshacer (Esc)">Deshacer</button><div class="bar"></div></div>`;
+  else if (!i.err){
+    const why = dis ? 'Sin lectura de la base: no se puede comprobar si sigue vigente' : (empty ? 'Escribe un mensaje para enviar' : '');
+    const ad = (dis||empty) ? `aria-disabled="true" title="${why}"` : '';
+    body += `<div class="c-actions"><button class="btn ghost" data-act="discard" ${dis?`aria-disabled="true" title="${why}"`:'title="Descartar (D)"'}>Descartar</button><span class="spacer"></span>
+      ${resp?`<button class="btn sched" data-act="schedule" aria-label="Programar" ${ad||'title="Programar (P)"'}><svg class="ico" aria-hidden="true"><use href="#i-clock"/></svg><span class="lbl">Programar</span></button>
+      <button class="btn slot ${stale?'warn':'primary'}" data-act="send" ${ad||`title="${stale?'Enviar igual (Ctrl+Shift+Enter)':'Enviar (Ctrl+Enter)'}"`}>${stale?'Enviar igual':'Enviar'}</button>`:''}</div>`;
+  }
+  const preview = resp ? `<p class="c-preview"><span class="lbl">Borrador:</span> ${esc(i.text||'—')}</p>` : '';
+  const repl = i.replaced ? `<p class="c-replaced">Actualizada ${i.time} · reemplaza a #${i.replaced}</p>` : '';
+  return `<li><article class="card cat-${i.cat} ${stale?'is-stale':''} ${i.id===S.sel?'is-sel':''} ${i.id===S.open?'open':''}" data-id="${i.id}" tabindex="0" aria-labelledby="n-${did}" aria-describedby="m-${did}">
+    <div class="c-head"><span class="c-name" id="n-${did}" title="${esc(i.chat)}">${i.group?icon('i-group'):''}${esc(i.chat)}</span>
+      <span class="c-cat">${catLabel[i.cat]}</span>
+      <button class="c-id ${i.replaced?'fresh':''}" data-copy="${i.id}" aria-label="Copiar id ${i.id}" title="Copiar #${i.id} (C)">#${i.id}</button>
+      <time class="c-time">${i.time}</time></div>
+    <span class="sr-only" id="m-${did}">${catLabel[i.cat]}${stale?', desactualizada':''}, id ${i.id}, ${i.time}</span>
+    ${repl}
+    <p class="c-last">${i.who?`<span class="who">${esc(i.who)}:</span> `:''}${esc(i.last)}</p>${preview}
+    <div class="c-body">${body}</div></article></li>`;
+}
+
+function schedHTML(i){
+  const when = i.schedWhen || 'mar 20 oct, 09:00';
+  return `<div class="c-sched"><div class="chips" role="group" aria-label="Atajos de hora">
+    <button class="chip" aria-pressed="${when==='hoy 19 oct, 11:52'}" data-q="hoy 19 oct, 11:52">En 1 h</button><button class="chip" aria-pressed="${when==='hoy 19 oct, 18:00'}" data-q="hoy 19 oct, 18:00">Hoy 18:00</button><button class="chip" aria-pressed="${when==='mar 20 oct, 09:00'}" data-q="mar 20 oct, 09:00">Mañana 09:00</button></div>
+    <div class="row"><label>Fecha<input type="date" value="2026-10-20"></label><label>Hora<input type="time" value="09:00"></label></div>
+    <p class="when">Sale ${when}</p>
+    <p class="hint">Si la PC está apagada a esa hora, el envío vence a los 30 min y pasa a Fallidos.</p>
+    <div class="c-actions"><button class="btn ghost" data-act="sched-back">Volver</button><span class="spacer"></span><button class="btn slot primary" data-act="sched-ok">Programar</button></div></div>`;
+}
+
+function schedList(){
+  if (!S.sched.length) return `<p class="empty">No hay envíos programados.</p>`;
+  return S.sched.map(s=>`<div class="row-item"><div class="t"><b>${s.group?icon('i-group'):''}${esc(s.chat)}</b><span>Sale ${s.when}</span></div><p>${esc(s.text)}</p><div class="acts"><button class="btn sm" data-sched-cancel="${s.id}">Cancelar</button></div></div>`).join('');
+}
+function failedList(){
+  if (!S.failed.length) return `<p class="empty">Ningún envío falló.</p>`;
+  return S.failed.map(f=> f.phase==='sending'
+    ? `<div class="row-item failed"><div class="t"><b>${esc(f.chat)}</b></div><div class="c-sending"><span>Reintentando en <b class="cd">${f.left??5}</b> s</span><button class="btn slot" data-retry-undo="${f.id}">Deshacer</button><div class="bar"></div></div></div>`
+    : `<div class="row-item failed"><div class="t"><b>${f.group?icon('i-group'):''}${esc(f.chat)}</b></div><p>${esc(f.text)}</p><span class="why">${esc(f.why)}</span><div class="acts"><button class="btn slot" data-retry="${f.id}" ${blocked()?'aria-disabled="true"':''}>Reintentar</button></div></div>`).join('');
+}
+
+function fitDrafts(){ document.querySelectorAll('.c-draft').forEach(ta=>{ ta.style.height='auto'; ta.style.height=(ta.scrollHeight+2)+'px'; }); }
+
+function render(){
+  const sc = S.scenario, nodb = sc==='nodb';
+  const b = [];
+  if (sc==='daemon'||sc==='all') b.push(`<div class="banner err" role="alert">${icon('i-warn')}<p><strong>WhatsApp está desconectado.</strong> Lo que envíes queda en cola y sale cuando vuelva.</p><details><summary>Detalles</summary>Sesión desvinculada desde las 10:31. Hay que volver a escanear el QR en el daemon.</details></div>`);
+  if (sc==='stale'||sc==='all') b.push(`<div class="banner warn" role="status">${icon('i-db')}<p><strong>Sin lectura de la base desde 10:41:02.</strong> Reintentando… Enviar está en pausa.</p></div>`);
+  if (sc==='agent'||sc==='all') b.push(`<div class="banner warn" role="status">${icon('i-warn')}<p><strong>El agente no da señales desde las 10:05</strong> (hace 38 min). No van a llegar sugerencias nuevas.</p><div class="acts"><button class="btn sm" id="copyCmd">Copiar comando de arranque</button></div></div>`);
+  $('#banners').innerHTML = b.join('');
+  const more = $('#bannerMore');
+  more.textContent = b.length>1 ? `${b.length-1} aviso${b.length>2?'s':''} más: amplía la ventana para verlos` : '';
+  more.style.visibility = b.length>1 ? '' : 'hidden'; more.style.height = b.length>1 ? '' : '0'; more.style.padding = b.length>1 ? '' : '0';
+
+  const lvl = (sc==='daemon'||sc==='all'||nodb)?'bad':(sc==='agent'||sc==='stale')?'warn':'';
+  for (const el of [$('#health'),$('#cH')]) el.className='health '+lvl;
+  $('#health').setAttribute('aria-label', lvl==='bad'?'Hay un problema grave':lvl==='warn'?'Hay un aviso':'Todo funciona');
+
+  const pend = S.items.filter(i=>i.phase!=='gone');
+  const nP = ['empty','loading','nodb'].includes(sc)?0:pend.length;
+  $('#tP').textContent = nP; $('#tS').textContent = S.sched.length; $('#tF').textContent = S.failed.length;
+  $('#tF').className = 'c'+(S.failed.length?' bad':'');
+  $('#cN').textContent = nP; $('#cF').textContent = S.failed.length? `${S.failed.length} fallido${S.failed.length>1?'s':''}`:'';
+  $('#counter').setAttribute('aria-label',`whatcrow: ${nP} por aprobar, ${S.failed.length} fallidos. Abrir`);
+
+  if (win.clientWidth>=960 && S.tab!=='pending') S.tab='pending';
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t.dataset.tab===S.tab));
+
+  const cnt = c => pend.filter(i=>c==='all'||i.cat===c).length;
+  $('#filters').innerHTML = S.tab==='pending' && !['empty','loading','nodb'].includes(sc) ? [['all','Todas'],['respuesta','Responder'],['tarea','Tareas'],['esperando','Esperando']]
+     .map(([k,l])=>`<button class="chip" aria-pressed="${S.filter===k}" data-filter="${k}">${l} <span class="num">${cnt(k)}</span></button>`).join('') : '';
+
+  const list = $('#colList'), det = $('#colDetail'), side = $('#colSide');
+  if (nodb){
+    list.innerHTML = `<div class="empty" role="alert">${icon('i-db')}<h2>No encuentro la base de datos</h2><p>whatcrow lee las sugerencias de este archivo y no pudo abrirlo:</p><p class="path">C:\\dev\\whatsapp\\data\\wa.sqlite</p><p>Revisa que la ruta sea correcta o elige otro archivo.</p><div class="acts"><button class="btn primary" data-open-settings>Elegir archivo…</button><button class="btn">Reintentar</button></div></div>`;
+    det.innerHTML=''; side.innerHTML=''; status(); return;
+  }
+  if (sc==='loading'){
+    list.innerHTML = `<div class="list" aria-busy="true" aria-label="Cargando sugerencias"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div><p class="empty" style="padding:10px 2px">Abriendo la base…</p>`;
+    det.innerHTML=''; side.innerHTML=''; status(); return;
+  }
+  side.innerHTML = `<div><div class="sec-h">Programados <span class="num">${S.sched.length}</span></div><div class="list">${schedList()}</div></div><div><div class="sec-h">Fallidos <span class="num">${S.failed.length}</span></div><div class="list">${failedList()}</div></div>`;
+  if (S.tab==='sched'){ list.innerHTML = `<div class="list">${schedList()}</div>`; det.innerHTML=''; status(); return; }
+  if (S.tab==='failed'){ list.innerHTML = `<div class="list">${failedList()}</div>`; det.innerHTML=''; status(); return; }
+
+  const vis = sc==='empty' ? [] : visibleItems();
+  if (!vis.length){
+    list.innerHTML = S.filter!=='all' && sc!=='empty'
+      ? `<div class="empty"><h2>No hay ${catLabel[S.filter].toLowerCase()} pendientes.</h2><button class="linkbtn" data-filter="all">Ver todas</button></div>`
+      : `<div class="empty"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#crow"/></svg><h2>Nada por aprobar.</h2><p>El agente revisó a las 10:38; la próxima vuelta es cerca de las 10:48.</p><div class="acts"><button class="linkbtn" data-goto="sched">Programados (${S.sched.length})</button><button class="linkbtn" data-goto="failed">Fallidos (${S.failed.length})</button></div></div>`;
+    det.innerHTML = `<div class="empty"><p>Cuando llegue una sugerencia, aparece acá.</p></div>`;
+    status(); return;
+  }
+  if (!vis.some(i=>i.id===S.sel)) S.sel = vis[0].id;
+  const st = list.scrollTop;
+  list.innerHTML = `<ul class="list" role="list" aria-label="Sugerencias pendientes">${vis.map(i=>cardHTML(i,'l')).join('')}</ul>`;
+  list.scrollTop = st;
+  const selItem = S.items.find(i=>i.id===S.sel);
+  det.innerHTML = selItem ? `<div class="list">${cardHTML(selItem,'d').replace(/^<li>|<\/li>$/g,'')}</div>` : '';
+  status(); fitDrafts();
+}
+
+function status(){
+  const sc = S.scenario;
+  const ag = (sc==='agent'||sc==='all') ? `<i class="warn"></i>Agente: hace 38 min` : `<i></i>Agente: hace 3 min`;
+  const wa = (sc==='daemon'||sc==='all') ? `<i class="bad"></i>WhatsApp desconectado` : `<i></i>WhatsApp conectado`;
+  const rd = (sc==='stale'||sc==='all') ? `<i class="warn"></i>Leído 10:41:02` : (sc==='nodb'?`<i class="bad"></i>Sin base`:`Leído <span class="num">10:42:15</span>`);
+  $('#status').innerHTML = `<span class="s">${ag}</span><span class="s">${wa}</span><span class="grow"></span><span class="s">${rd}</span>`;
+}
+
+/* ---------- Toast ---------- */
+let toastT;
+function toast(msg, undo){
+  const t = $('#toast'); $('#toastMsg').textContent = msg; t.hidden=false;
+  $('#toastUndo').hidden = !undo; lastUndo = undo||null;
+  $('#live').textContent = msg;
+  clearTimeout(toastT); toastT = setTimeout(()=>{t.hidden=true; lastUndo=null;},5000);
+}
+$('#toastUndo').onclick = ()=>{ if(lastUndo){lastUndo(); lastUndo=null;} $('#toast').hidden=true; };
+
+/* ---------- Acciones ---------- */
+const byId = id => S.items.find(i=>i.id===+id);
+function next(id){ const v=visibleItems(); const k=v.findIndex(i=>i.id===id); const n=v[k+1]||v[k-1]; if(n){S.sel=n.id;S.open=n.id;} }
+
+function copyId(id){
+  const txt = '#'+id;
+  const done = ()=>toast(`Copiado ${txt}`);
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, ()=>toast('No se pudo copiar. Selecciona el id y usa Ctrl+C.'));
+  else done();
+}
+function replaceId(i, newId, time){
+  i.replaced = i.id; i.id = newId; i.time = time;
+  if (S.sel===i.replaced) S.sel=newId; if (S.open===i.replaced) S.open=newId;
+  setTimeout(()=>{ i.replaced=null; render(); }, 10000);
+}
+
+function startSend(i){
+  if (blocked() || !i.text.trim()) return;
+  i.phase='sending'; i.left=5; render();
+  $('#live').textContent = `Se enviará a ${i.chat} en 5 segundos. Escape para deshacer.`;
+  timers[i.id] = setInterval(()=>{
+    i.left--; document.querySelectorAll(`.card[data-id="${i.id}"] .cd`).forEach(e=>e.textContent=i.left);
+    if (i.left<=0){
+      clearInterval(timers[i.id]); delete timers[i.id];
+      next(i.id); i.phase='gone'; render();
+      const q = (S.scenario==='daemon'||S.scenario==='all');
+      toast(q?`En cola: sale cuando WhatsApp vuelva (${i.chat}).`:`Enviado a ${i.chat}.`);
+    }
+  },1000);
+}
+function undoSend(i){ clearInterval(timers[i.id]); delete timers[i.id]; i.phase='idle'; render(); toast('Envío cancelado. No se envió nada.'); focusCard(i.id); }
+const anySending = () => S.items.find(i=>i.phase==='sending');
+
+/* Foco con teclado: muestra la tarjeta entera, con sus botones (scroll-padding/margin cubren el toast) */
+function focusCard(id){ requestAnimationFrame(()=>{ const c=[...document.querySelectorAll(`.card[data-id="${id}"]`)].find(e=>e.offsetParent); if(c){ c.focus({preventScroll:true}); c.scrollIntoView({block:'nearest'}); } }); }
+
+document.addEventListener('click', e=>{
+  const t = e.target.closest('button,.c-head,.card');
+  if (!t) return;
+  const card = e.target.closest('.card'); const i = card && byId(card.dataset.id);
+
+  if (t.dataset.copy){ copyId(t.dataset.copy); return; }
+  if (t.dataset.preset){ setPreset(t.dataset.preset); $('#sizeMenu').hidden=true; return; }
+  if (t.id==='sizeBtn'){ const m=$('#sizeMenu'); m.hidden=!m.hidden; t.setAttribute('aria-expanded',!m.hidden); return; }
+  if (t.id==='setBtn' || t.hasAttribute('data-open-settings')){ $('#sheet').hidden=false; renderUpd(); $('#sheetClose').focus(); return; }
+  if (t.id==='sheetClose'){ $('#sheet').hidden=true; $('#setBtn').focus(); return; }
+  if (t.id==='swStart'){ t.setAttribute('aria-checked', t.getAttribute('aria-checked')!=='true'); return; }
+  if (t.dataset.th){ setTheme(t.dataset.th); return; }
+  if (t.id==='counter'){ setPreset(prevPreset||'normal'); return; }
+  if (t.id==='copyCmd'){ toast('Comando copiado: scripts\\start-agent.ps1'); return; }
+  if (t.classList.contains('tab')){ S.tab=t.dataset.tab; render(); return; }
+  if (t.dataset.filter){ S.filter=t.dataset.filter; render(); return; }
+  if (t.dataset.goto){ S.tab=t.dataset.goto; render(); return; }
+  if (t.dataset.schedCancel){ const s=S.sched.find(x=>x.id==t.dataset.schedCancel); S.sched=S.sched.filter(x=>x!==s); if(s.from) s.from.phase='idle'; render(); toast('Programación cancelada. La sugerencia volvió a Pendientes.'); return; }
+  if (t.dataset.retry){ if(t.getAttribute('aria-disabled')==='true')return; const f=S.failed.find(x=>x.id==t.dataset.retry); f.phase='sending'; f.left=5; render();
+    timers['f'+f.id]=setInterval(()=>{ f.left--; document.querySelectorAll('.row-item .cd').forEach(e=>e.textContent=f.left); if(f.left<=0){clearInterval(timers['f'+f.id]); S.failed=S.failed.filter(x=>x!==f); render(); toast(`Enviado a ${f.chat}.`);} },1000); return; }
+  if (t.dataset.retryUndo){ const f=S.failed.find(x=>x.id==t.dataset.retryUndo); clearInterval(timers['f'+f.id]); f.phase=null; render(); toast('Reintento cancelado.'); return; }
+  if (t.dataset.q && i){ i.schedWhen=t.dataset.q; render(); return; }
+
+  const act = t.dataset.act;
+  if (act && i){
+    if (t.getAttribute('aria-disabled')==='true') return;
+    if (act==='send') startSend(i);
+    if (act==='undo') undoSend(i);
+    if (act==='discard'){ next(i.id); i.phase='gone'; render(); toast(`Descartada: ${i.chat}.`, ()=>{i.phase='idle'; S.sel=i.id; S.open=i.id; render();}); }
+    if (act==='schedule'){ i.phase='schedule'; render(); }
+    if (act==='sched-back'){ i.phase='idle'; render(); }
+    if (act==='sched-ok'){ const when=i.schedWhen||'mar 20 oct, 09:00'; next(i.id); i.phase='gone'; const s={id:Date.now(),chat:i.chat,group:i.group,text:i.text,when,from:i}; S.sched.unshift(s); render();
+      toast(`Programado para ${when}.`, ()=>{ S.sched=S.sched.filter(x=>x!==s); i.phase='idle'; render(); }); }
+    if (act==='restore'){ i.text=i.draft; render(); }
+    if (act==='cf-view'){ i.cfView=!i.cfView; render(); }
+    if (act==='cf-use'){ const old=i.text; const c=i.conflict; i.draft=c.draft; i.text=c.draft; i.conflict=null; replaceId(i,c.id,c.time); render(); toast(`Usando la sugerencia nueva #${c.id}.`, ()=>{i.text=old; render();}); }
+    if (act==='cf-keep'){ const c=i.conflict; i.draft=c.draft; i.conflict=null; replaceId(i,c.id,c.time); render(); }
+    if (act==='err-close'){ next(i.id); i.phase='gone'; render(); }
+    return;
+  }
+  if (card && i && !e.target.closest('textarea,input,button')){
+    if (S.sel!==i.id || S.open!==i.id){ S.sel=i.id; S.open=i.id; render(); focusCard(i.id); }
+  }
+});
+
+document.addEventListener('input', e=>{
+  if (!e.target.matches('[data-draft]')) return;
+  const ta = e.target; ta.style.height='auto'; ta.style.height=(ta.scrollHeight+2)+'px';
+  const i = byId(ta.closest('.card').dataset.id); const was = !!i.text.trim(); const wasEd = i.text!==i.draft;
+  i.text = ta.value;
+  if (was !== !!i.text.trim() || wasEd !== (i.text!==i.draft)){ const pos=ta.selectionStart, id=ta.id; render(); const n=document.getElementById(id); if(n){n.focus(); n.setSelectionRange(pos,pos);} }
+});
+
+/* ---------- Teclado ---------- */
+document.addEventListener('keydown', e=>{
+  const inField = e.target.matches('textarea,input,select');
+  const card = e.target.closest && e.target.closest('.card');
+  const i = card && byId(card.dataset.id);
+  if (e.ctrlKey && !e.altKey && ['0','1','2','3'].includes(e.key)){ e.preventDefault(); setPreset(['counter','compact','normal','wide'][+e.key]); return; }
+  if (e.ctrlKey && e.key===','){ e.preventDefault(); $('#sheet').hidden=false; renderUpd(); return; }
+  if (e.altKey && ['1','2','3'].includes(e.key)){ e.preventDefault(); S.tab=['pending','sched','failed'][+e.key-1]; render(); return; }
+  if (e.key==='Escape'){
+    const s = anySending(); if (s){ undoSend(s); return; }
+    if (!$('#sheet').hidden){ $('#sheet').hidden=true; return; }
+    if (i && i.phase==='schedule'){ i.phase='idle'; render(); focusCard(i.id); return; }
+    if (inField && card){ card.focus(); return; }
+  }
+  if (e.ctrlKey && e.key.toLowerCase()==='z' && !inField){ const s=anySending(); if(s){undoSend(s);return;} if(lastUndo){lastUndo();lastUndo=null;$('#toast').hidden=true;} return; }
+  if (e.ctrlKey && e.key==='Enter' && i && i.cat==='respuesta'){
+    e.preventDefault();
+    if (i.newer && !e.shiftKey){ document.querySelectorAll(`.card[data-id="${i.id}"] .c-stale`).forEach(el=>{el.classList.remove('flash');void el.offsetWidth;el.classList.add('flash');}); $('#live').textContent='La sugerencia está desactualizada. Usa Control Mayúscula Enter para enviar igual.'; return; }
+    startSend(i); return;
+  }
+  if (inField) return;
+  const vis = visibleItems();
+  if (['ArrowDown','ArrowUp','j','k'].includes(e.key) && S.tab==='pending' && vis.length){
+    e.preventDefault(); let k = vis.findIndex(x=>x.id===S.sel); k += (e.key==='ArrowDown'||e.key==='j')?1:-1; k=Math.max(0,Math.min(vis.length-1,k));
+    S.sel=vis[k].id; S.open=vis[k].id; render(); focusCard(S.sel); return;
+  }
+  if (!i || e.target!==card) return;
+  if (e.key==='c'){ copyId(i.id); return; }
+  if (e.key==='Enter' || e.key==='e'){ e.preventDefault(); S.open=i.id; S.sel=i.id; render(); requestAnimationFrame(()=>{ const ta=[...document.querySelectorAll(`.card[data-id="${i.id}"] textarea`)].find(x=>x.offsetParent); ta?ta.focus():focusCard(i.id); }); }
+  if (e.key==='p' && i.cat==='respuesta'){ i.phase='schedule'; render(); focusCard(i.id); }
+  if (e.key==='d' || e.key==='Delete'){ card.querySelector('[data-act=discard]')?.click(); focusCard(S.sel); }
+});
+
+/* ---------- Tamaño y tema ---------- */
+const presets = {counter:[184,48],min:[300,360],compact:[330,440],normal:[330,660],w380:[380,660],wide600:[600,660],wide:[760,660],huge:[960,800]};
+let prevPreset='normal';
+function setPreset(p){
+  stage.classList.remove('fill');
+  if (p!=='counter') prevPreset=p;
+  const [w,h]=presets[p]; win.style.minWidth = p==='counter'?'0':''; win.style.width=w+'px'; win.style.height=h+'px';
+  win.classList.toggle('is-counter',p==='counter');
+  document.querySelectorAll('.seg [data-preset]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.preset===p));
+  if (p==='counter') requestAnimationFrame(()=>$('#counter').focus());
+}
+$('#fill').onclick = ()=>{ win.classList.remove('is-counter'); win.style.minWidth=''; stage.classList.toggle('fill'); };
+function setTheme(t){ win.dataset.theme=t; $('#theme').value=t; document.querySelectorAll('[data-th]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.th===t)); }
+$('#theme').onchange = e=>setTheme(e.target.value);
+$('#scenario').onchange = e=>{ S.scenario=e.target.value; S.tab='pending'; render(); };
+
+let lastBand=1;
+new ResizeObserver(()=>{
+  const w=win.clientWidth, h=win.clientHeight; $('#sz').textContent=`${Math.round(w)} × ${Math.round(h)}`;
+  const band = w>=960?3:w>=600?2:1;
+  if (band!==lastBand){ lastBand=band; render(); } else fitDrafts();
+}).observe(win);
+
+/* ---------- Simulaciones ---------- */
+$('#simNew').onclick = ()=>{
+  const i = S.items.find(x=>x.chat==='Rosa Quispe'); if (!i || i.phase==='gone') return;
+  if (i.text===i.draft) i.text += ' Te escribo cuando salga el camión.';
+  i.conflict = {id:158,time:'10:58',draft:'Hola Rosa, confirmado: sale mañana a primera hora. Te aviso cuando el transportista recoja.'};
+  S.sel=i.id; S.open=i.id; S.tab='pending'; S.filter='all'; render(); focusCard(i.id);
+};
+$('#simRepl').onclick = ()=>{
+  const i = S.items.find(x=>x.chat==='Compras Andina'); if (!i || i.phase==='gone' || i.replaced) return;
+  i.draft = 'Esperemos la segunda cotización hasta el miércoles a mediodía. Si no llega, aprobamos Huallaga.'; i.text = i.draft;
+  replaceId(i, 160, '11:02'); S.sel=i.id; S.open=i.id; S.tab='pending'; S.filter='all'; render(); focusCard(i.id);
+  $('#live').textContent = `Sugerencia actualizada: ahora es la #160, reemplaza a la #146.`;
+};
+$('#simMsg').onclick = ()=>{
+  const i = S.items.find(x=>x.chat==='Hugo Mendoza'); if (!i || i.phase==='gone') return;
+  i.text = i.text || 'Sí, el jueves a las 9 en planta.'; i.newer={time:'10:59',text:'Mejor el viernes, el jueves no hay camioneta.'}; S.sel=i.id; S.open=i.id; S.tab='pending'; S.filter='all'; render(); focusCard(i.id);
+};
+
+/* ---------- Actualizaciones ---------- */
+let U = {state:'idle',pct:0};
+function renderUpd(){
+  let h='';
+  switch(U.state){
+    case 'idle': h=`<button class="btn" id="updGo">Buscar actualizaciones</button><p class="meta">Última búsqueda: hoy 08:12.</p>`; break;
+    case 'checking': h=`<button class="btn" aria-disabled="true"><span class="spin" aria-hidden="true"></span>Buscando…</button>`; break;
+    case 'ok': h=`<p>Tienes la última versión (0.3.1).</p><button class="btn" id="updGo">Buscar otra vez</button>`; break;
+    case 'err': h=`<p class="msg-err">No se pudo comprobar: sin conexión con GitHub.</p><button class="btn" id="updGo">Reintentar</button>`; break;
+    case 'avail': h=`<p><b>Hay una versión nueva: 0.4.0</b></p><p class="meta">Atajos para programar más rápido y arreglos en el modo contador.</p><button class="btn primary" id="updDl">Descargar e instalar</button>`; break;
+    case 'dl': h=`<p>Descargando 0.4.0… <span class="num">${U.pct} %</span></p><div class="prog" role="progressbar" aria-valuenow="${U.pct}" aria-valuemin="0" aria-valuemax="100" aria-label="Descarga"><div style="width:${U.pct}%"></div></div><p class="meta num">${(18*U.pct/100).toFixed(1).replace('.',',')} de 18,0 MB</p><button class="btn" id="updCancel">Cancelar</button>`; break;
+    case 'ready': { const busy=!!anySending(); h=`<p><b>0.4.0 lista.</b> Se instala al reiniciar.</p><div style="display:flex;gap:6px"><button class="btn primary" ${busy?'aria-disabled="true"':''}>Reiniciar ahora</button><button class="btn ghost">Más tarde</button></div>${busy?'<p class="meta">Espera a que termine el envío.</p>':''}`; } break;
+  }
+  $('#upd').innerHTML=h; $('#updDot').hidden = U.state!=='ready' && U.state!=='avail';
+}
+let dlT;
+$('#upd').addEventListener('click', e=>{
+  if (e.target.id==='updGo'){ U.state='checking'; renderUpd(); setTimeout(()=>{ U.state=$('#updRes').value; renderUpd(); },1200); }
+  if (e.target.id==='updDl'){ U.state='dl'; U.pct=0; renderUpd(); dlT=setInterval(()=>{ U.pct=Math.min(100,U.pct+7); if(U.pct>=100){clearInterval(dlT); U.state='ready';} renderUpd(); },150); }
+  if (e.target.id==='updCancel'){ clearInterval(dlT); U.state='avail'; renderUpd(); }
+});
+
+render(); renderUpd();
+</script>
+</body>
+</html>
