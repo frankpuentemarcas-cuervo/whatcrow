@@ -31,9 +31,9 @@ export function dayMonth(ts: number): string {
   return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
-/** "mar 20 oct, 09:00". */
+/** "mar 20 oct, 09:00" (ui-spec §5.8). */
 export function saleLabel(ts: number): string {
-  return `${dayMonth(ts)} ${clock(ts)}`;
+  return `${dayMonth(ts)}, ${clock(ts)}`;
 }
 
 /** Fecha para `<input type="date">`, en hora local. */

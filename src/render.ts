@@ -20,6 +20,13 @@ export interface ScheduleForm {
   presetAt: number | null;
 }
 
+/** Campo enfocado dentro de una tarjeta, para devolverle el foco tras pintar. */
+interface FieldFocus {
+  selector: string;
+  start: number | null;
+  end: number | null;
+}
+
 export interface CardState {
   id: number;
   data: SuggestionView;
@@ -138,6 +145,11 @@ export class Renderer {
   private readonly updDot: HTMLElement;
   private readonly versionLabel: HTMLElement;
   private readonly live: HTMLElement;
+  /** Firma del contenido de la pestaña Programados/Fallidos ya pintado. */
+  private listTab: Tab | null = null;
+  private listSig = '';
+  /** Firma de la columna lateral (Programados + Fallidos). */
+  private sideSig = '';
 
   constructor(doc: Document = document) {
     this.doc = doc;
@@ -213,7 +225,7 @@ export class Renderer {
   private renderHealth(s: AppViewState): void {
     const level = s.dbMissing || (s.health && !s.health.daemonHealthy)
       ? 'bad'
-      : (s.health && !s.health.agentHealthy) || s.paused
+      : (s.health && !s.health.agentHealthy) || (s.paused && !s.loading)
         ? 'warn'
         : '';
     for (const dot of [this.health, this.cH]) dot.className = `health ${level}`;
@@ -240,7 +252,7 @@ export class Renderer {
       items.push(`<div class="banner warn" role="status">${icon('i-warn')}<p><strong>El agente no da señales ${when}.</strong> No van a llegar sugerencias nuevas.</p>
         <div class="acts"><button class="btn sm" data-act="copy-command">Copiar comando de arranque</button></div></div>`);
     }
-    if (s.paused && !s.dbMissing) {
+    if (s.paused && !s.dbMissing && !s.loading) {
       const since = s.lastOkAt ? `desde ${clockSeconds(s.lastOkAt)}` : 'todavía no hay una lectura';
       items.push(`<div class="banner warn" role="status">${icon('i-db')}<p><strong>Sin lectura de la base ${since}.</strong> Reintentando… Enviar está en pausa.</p></div>`);
     }
@@ -286,7 +298,13 @@ export class Renderer {
   }
 
   private renderPending(s: AppViewState): void {
+    if (this.listTab !== s.tab) {
+      this.listTab = s.tab;
+      this.listSig = '';
+    }
+
     if (s.dbMissing) {
+      this.listSig = '';
       this.colList.innerHTML = `<div class="empty" role="alert">${icon('i-db')}<h2>No encuentro la base de datos</h2>
         <p>whatcrow lee las sugerencias de este archivo y no pudo abrirlo:</p>
         <p class="path">${esc(s.dbPath)}</p>
@@ -296,19 +314,30 @@ export class Renderer {
     }
 
     if (s.loading) {
+      this.listSig = '';
       this.colList.innerHTML = `<div class="list" aria-busy="true" aria-label="Cargando sugerencias"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
         <p class="empty" style="padding:10px 2px">Abriendo la base…</p>`;
       return;
     }
 
     if (s.tab === 'sched') {
-      this.colList.innerHTML = `<div class="list">${this.scheduledList(s)}</div>`;
+      const sig = this.outboxSignature(s.tab, s);
+      if (sig !== this.listSig) {
+        this.listSig = sig;
+        this.colList.innerHTML = `<div class="list">${this.scheduledList(s)}</div>`;
+      }
       return;
     }
     if (s.tab === 'failed') {
-      this.colList.innerHTML = `<div class="list">${this.failedList(s)}</div>`;
+      const sig = this.outboxSignature(s.tab, s);
+      if (sig !== this.listSig) {
+        this.listSig = sig;
+        this.colList.innerHTML = `<div class="list">${this.failedList(s)}</div>`;
+      }
       return;
     }
+
+    this.listSig = '';
 
     const visible = s.cards.filter(
       (card) => card.phase !== 'gone' && (s.filter === 'all' || card.data.category === s.filter),
@@ -316,11 +345,15 @@ export class Renderer {
 
     if (!visible.length) {
       const filtered = s.filter !== 'all';
+      const links =
+        s.mode.width === 'three-col'
+          ? ''
+          : `<div class="acts"><button class="linkbtn" data-goto="sched">Programados (${s.scheduled.length})</button><button class="linkbtn" data-goto="failed">Fallidos (${s.failed.length})</button></div>`;
       this.colList.innerHTML = filtered
         ? `<div class="empty"><h2>No hay ${CAT_LABEL[s.filter]?.toLowerCase() ?? 'sugerencias'} pendientes.</h2><button class="linkbtn" data-filter="all">Ver todas</button></div>`
         : `<div class="empty">${icon('crow')}<h2>Nada por aprobar.</h2>
           <p>${this.emptyDetail(s)}</p>
-          <div class="acts"><button class="linkbtn" data-goto="sched">Programados (${s.scheduled.length})</button><button class="linkbtn" data-goto="failed">Fallidos (${s.failed.length})</button></div></div>`;
+          ${links}</div>`;
       return;
     }
 
@@ -371,18 +404,187 @@ export class Renderer {
   }
 
   private renderSide(s: AppViewState): void {
-    this.colSide.innerHTML = `<div><div class="sec-h">Programados <span class="num">${s.scheduled.length}</span></div><div class="list">${this.scheduledList(s)}</div></div>
+    const sig = this.outboxSignature('side', s);
+    if (sig !== this.sideSig) {
+      this.sideSig = sig;
+      this.colSide.innerHTML = `<div><div class="sec-h">Programados <span class="num">${s.scheduled.length}</span></div><div class="list">${this.scheduledList(s)}</div></div>
       <div><div class="sec-h">Fallidos <span class="num">${s.failed.length}</span></div><div class="list">${this.failedList(s)}</div></div>`;
+    }
+    this.updateCountdowns(this.colSide, s);
+  }
+
+  /** Cambia solo cuando los datos de las listas cambian; la cuenta regresiva va aparte. */
+  private outboxSignature(scope: Tab | 'side', s: AppViewState): string {
+    return JSON.stringify([
+      scope,
+      s.scheduled.map((item) => [item.id, item.chatName, item.text, item.sendAt]),
+      s.failed.map((item) => [item.id, item.chatName, item.text, item.error, item.status]),
+      [...s.retries.keys()],
+      s.paused,
+      s.dbMissing,
+    ]);
+  }
+
+  /** Actualiza los segundos de Reintentar sin reconstruir la fila (la barra anima sola). */
+  private updateCountdowns(root: HTMLElement, s: AppViewState): void {
+    for (const row of Array.from(root.querySelectorAll<HTMLElement>('[data-outbox-id]'))) {
+      const startedAt = s.retries.get(Number(row.dataset.outboxId));
+      if (startedAt === undefined) continue;
+      const countdown = row.querySelector<HTMLElement>('.cd');
+      if (countdown) {
+        countdown.textContent = String(Math.max(0, Math.ceil((UNDO_MS - (s.now - startedAt)) / 1000)));
+      }
+    }
+  }
+
+  /** Pulso de la cuenta de Reintentar: no hace falta repintar toda la interfaz. */
+  tickRetries(s: AppViewState): void {
+    this.updateCountdowns(this.colSide, s);
+    this.updateCountdowns(this.colList, s);
   }
 
   /** Pinta una tarjeta sin tocar el campo que tiene el foco (ui-spec §5.4). */
   private paintCard(host: HTMLElement, card: CardState, s: AppViewState, where: 'l' | 'd'): void {
     const existing = host.querySelector<HTMLElement>('.card');
-    if (existing && this.isFieldFocused(card.id)) {
+    // Se parchea en el lugar cuando la estructura no cambió: si hay un campo
+    // enfocado (para no perder el cursor) o si la cuenta regresiva / salida está
+    // corriendo (reconstruir reiniciaría la animación de la barra).
+    const structural = card.phase === 'idle' || card.phase === 'schedule';
+    const unchanged = existing?.dataset.sig === this.cardSignature(card);
+    if (existing && unchanged && (!structural || this.isFieldFocused(card.id))) {
       existing.className = this.cardClass(card, s);
+      this.patchEditing(existing, card, s);
       return;
     }
+
+    const caret = this.captureFocus(host);
     host.innerHTML = this.cardArt(card, s, where);
+    this.restoreFocus(host, caret);
+  }
+
+  private countdown(card: CardState, now: number): number {
+    if (card.startedAt === null) return 5;
+    return Math.max(0, Math.ceil((UNDO_MS - (now - card.startedAt)) / 1000));
+  }
+
+  private cardSignature(card: CardState): string {
+    return [
+      card.phase,
+      card.data.category,
+      String(card.data.updatedAt),
+      card.conflict ? 'conflict' : '',
+      card.data.newer ? 'stale' : '',
+      card.error ? 'error' : '',
+      card.replaced ? 'replaced' : '',
+    ]
+      .filter(Boolean)
+      .join('|');
+  }
+
+  /**
+   * Recuerda el campo enfocado dentro de esta tarjeta antes de reconstruirla.
+   * Solo aplica al panel que realmente contiene el foco (lista o detalle).
+   */
+  private captureFocus(host: HTMLElement): FieldFocus | null {
+    const active = this.doc.activeElement;
+    if (!active || !host.contains(active)) return null;
+    if (active instanceof HTMLTextAreaElement && active.id.startsWith('d-')) {
+      return { selector: `#${active.id}`, start: active.selectionStart, end: active.selectionEnd };
+    }
+    if (active.matches('input[data-sched-date]')) {
+      return { selector: 'input[data-sched-date]', start: null, end: null };
+    }
+    if (active.matches('input[data-sched-time]')) {
+      return { selector: 'input[data-sched-time]', start: null, end: null };
+    }
+    if (active.matches('.card')) {
+      return { selector: '.card', start: null, end: null };
+    }
+    if (active.matches('[data-act]')) {
+      return { selector: `[data-act="${active.getAttribute('data-act')}"]`, start: null, end: null };
+    }
+    return null;
+  }
+
+  private restoreFocus(host: HTMLElement, caret: FieldFocus | null): void {
+    if (!caret) return;
+    const field = host.querySelector<HTMLElement>(caret.selector);
+    if (!field) return;
+    field.focus({ preventScroll: true });
+    if (caret.start !== null && field instanceof HTMLTextAreaElement) {
+      field.setSelectionRange(caret.start, caret.end ?? caret.start);
+    }
+  }
+
+  /**
+   * Con el foco dentro del editor no se reconstruye la tarjeta: se actualizan
+   * solo los indicadores y los estados de los botones para no perder el cursor.
+   */
+  private patchEditing(host: HTMLElement, card: CardState, s: AppViewState): void {
+    if (card.phase === 'sending') {
+      const countdown = host.querySelector<HTMLElement>('.c-sending .cd');
+      if (countdown) countdown.textContent = String(this.countdown(card, s.now));
+      return;
+    }
+    if (card.phase === 'leaving' || card.phase === 'gone') return;
+
+    const edited = host.querySelector<HTMLElement>('.c-edited');
+    if (edited) edited.hidden = card.text === card.baseDraft;
+
+    const preview = host.querySelector<HTMLElement>('.c-preview');
+    if (preview) preview.innerHTML = `<span class="lbl">Borrador:</span> ${esc(card.text || '—')}`;
+
+    // El estado es la fuente de verdad: si el agente actualizó el borrador, el campo lo refleja.
+    const draft = host.querySelector<HTMLTextAreaElement>('textarea.c-draft');
+    if (draft && draft.value !== card.text) draft.value = card.text;
+
+    const response = card.data.category === 'respuesta';
+    const blocked = s.paused || s.dbMissing;
+    const empty = response && !card.text.trim();
+    const reason = blocked
+      ? 'Sin lectura de la base: no se puede comprobar si sigue vigente'
+      : empty
+        ? 'Escribe un mensaje para enviar'
+        : '';
+
+    const sync = (selector: string, disabled: boolean, enabledTitle: string): void => {
+      const button = host.querySelector<HTMLElement>(selector);
+      if (!button) return;
+      if (disabled) {
+        button.setAttribute('aria-disabled', 'true');
+        button.setAttribute('title', reason);
+      } else {
+        button.removeAttribute('aria-disabled');
+        button.setAttribute('title', enabledTitle);
+      }
+    };
+
+    sync('[data-act="send"]', blocked || empty, card.data.newer ? 'Enviar igual (Ctrl+Shift+Enter)' : 'Enviar (Ctrl+Enter)');
+    sync('[data-act="schedule"]', blocked || empty, 'Programar (P)');
+    sync('[data-act="discard"]', blocked, 'Descartar (D)');
+
+    if (card.phase === 'schedule' && card.sched) {
+      const at = fromInputs(card.sched.date, card.sched.time);
+      const valid = at !== null && at > s.now;
+      const when = host.querySelector<HTMLElement>('.c-sched .when');
+      if (when) when.textContent = at ? `Sale ${saleLabel(at)}` : 'Elige una hora futura';
+
+      const ok = host.querySelector<HTMLElement>('[data-act="sched-ok"]');
+      if (ok) {
+        const disabled = !valid || blocked || !card.text.trim();
+        if (disabled) {
+          ok.setAttribute('aria-disabled', 'true');
+          ok.setAttribute('title', blocked ? reason : 'Elige una hora futura');
+        } else {
+          ok.removeAttribute('aria-disabled');
+          ok.removeAttribute('title');
+        }
+      }
+
+      for (const chip of Array.from(host.querySelectorAll<HTMLElement>('[data-act="sched-chip"]'))) {
+        chip.setAttribute('aria-pressed', String(Number(chip.dataset.at) === card.sched.presetAt));
+      }
+    }
   }
 
   private isFieldFocused(id: number): boolean {
@@ -420,9 +622,9 @@ export class Renderer {
     const preview = response
       ? `<p class="c-preview"><span class="lbl">Borrador:</span> ${esc(card.text || '—')}</p>`
       : '';
-    const body = this.cardBody(card, s);
+    const body = this.cardBody(card, s, did);
 
-    return `<article class="${this.cardClass(card, s)}" data-card-id="${card.id}" tabindex="0" aria-labelledby="n-${did}" aria-describedby="m-${did}">
+    return `<article class="${this.cardClass(card, s)}" data-card-id="${card.id}" data-sig="${esc(this.cardSignature(card))}" tabindex="0" aria-labelledby="n-${did}" aria-describedby="m-${did}">
       <div class="c-head" data-select>
         <span class="c-name" id="n-${did}" title="${esc(view.chatName)}">${group}${esc(view.chatName)}</span>
         <span class="c-cat">${label}</span>
@@ -437,7 +639,7 @@ export class Renderer {
     </article>`;
   }
 
-  private cardBody(card: CardState, s: AppViewState): string {
+  private cardBody(card: CardState, s: AppViewState, did: string): string {
     const view = card.data;
     const response = view.category === 'respuesta';
     const stale = !!view.newer;
@@ -459,8 +661,8 @@ export class Renderer {
     if (response) {
       const dirty = card.text !== card.baseDraft;
       body += `<div class="c-draftwrap">
-        <label class="sr-only" for="d-${card.id}">Borrador para ${esc(view.chatName)}</label>
-        <textarea class="c-draft" id="d-${card.id}" data-draft rows="2" ${card.phase === 'sending' ? 'readonly' : ''} placeholder="Escribe un mensaje para enviar">${esc(card.text)}</textarea>
+        <label class="sr-only" for="d-${did}">Borrador para ${esc(view.chatName)}</label>
+        <textarea class="c-draft" id="d-${did}" data-draft rows="2" ${card.phase === 'sending' ? 'readonly' : ''} placeholder="Escribe un mensaje para enviar">${esc(card.text)}</textarea>
         <span class="c-edited" ${dirty ? '' : 'hidden'}>Editado <button class="linkbtn" data-act="restore">Restaurar</button></span>
       </div>`;
     }
@@ -471,7 +673,7 @@ export class Renderer {
     if (card.phase === 'schedule') {
       body += this.scheduleForm(card, s);
     } else if (card.phase === 'sending') {
-      const left = card.startedAt === null ? 5 : Math.max(0, Math.ceil((UNDO_MS - (s.now - card.startedAt)) / 1000));
+      const left = this.countdown(card, s.now);
       body += `<div class="c-sending"><span>Enviando a ${esc(view.chatName)} en <b class="cd">${left}</b> s</span>
         <button class="btn slot" data-act="undo-send" title="Deshacer (Esc)">Deshacer</button><div class="bar"></div></div>`;
     } else {

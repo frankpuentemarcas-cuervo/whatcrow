@@ -1,24 +1,11 @@
 /* whatcrow: port del mockup aprobado (docs/design/mockup.html).
    Sin la barra de escenarios. Las fuentes se cargan del bundle local. */
 
+/* Fuente variable (400–700 en un solo archivo), subconjunto latino: cubre el español. Licencia en fonts/OFL.txt. */
 @font-face {
   font-family: "Atkinson Hyperlegible Next";
-  src: url("./fonts/AtkinsonHyperlegibleNext-Regular.woff2") format("woff2");
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Atkinson Hyperlegible Next";
-  src: url("./fonts/AtkinsonHyperlegibleNext-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Atkinson Hyperlegible Next";
-  src: url("./fonts/AtkinsonHyperlegibleNext-Bold.woff2") format("woff2");
-  font-weight: 700;
+  src: url("./fonts/AtkinsonHyperlegibleNext-latin.woff2") format("woff2");
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
 }
