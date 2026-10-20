@@ -18,6 +18,7 @@ import { UndoQueue } from './logic/undo';
 import { formatId } from './logic/ids';
 import { fromInputs, isoDate, isoTime, saleLabel, schedulePresets } from './logic/format';
 import { mergeCards } from './logic/cards';
+import { shortcutTarget } from './logic/target';
 
 const PRESET_KEYS = ['counter', 'compact', 'normal', 'wide'] as const;
 type PresetKey = (typeof PRESET_KEYS)[number];
@@ -243,8 +244,13 @@ function visibleCards(): CardState[] {
 
 function activeCard(): CardState | undefined {
   const focused = document.activeElement?.closest<HTMLElement>('[data-card-id]');
-  if (focused) return cardById(Number(focused.dataset.cardId));
-  return state.selectedId === null ? undefined : cardById(state.selectedId);
+  const id = shortcutTarget({
+    focusedId: focused ? Number(focused.dataset.cardId) : null,
+    selectedId: state.selectedId,
+    tab: state.tab,
+    visibleIds: visibleCards().map((card) => card.id),
+  });
+  return id === null ? undefined : cardById(id);
 }
 
 function focusCard(id: number): void {
@@ -331,6 +337,8 @@ function startSend(card: CardState, allowStale = false): void {
   }
 
   const text = card.text;
+  // Lo que el usuario vio al aprobar: si entra otro mensaje durante los 5 s, Rust rechaza el envío.
+  const seen = card.data.newer?.id ?? null;
   card.phase = 'sending';
   card.startedAt = Date.now();
   card.error = null;
@@ -342,14 +350,14 @@ function startSend(card: CardState, allowStale = false): void {
   // objeto en cada mezcla de snapshot, así que una referencia capturada quedaría
   // huérfana dentro de los 5 s de la cuenta regresiva.
   undo.start(`send:${card.id}`, () => {
-    void commitSend(card.id, text);
+    void commitSend(card.id, text, seen);
   });
 }
 
-async function commitSend(id: number, text: string): Promise<void> {
+async function commitSend(id: number, text: string, seen: string | null): Promise<void> {
   const chatName = cardById(id)?.data.chatName ?? 'el chat';
   try {
-    await api.send(id, text);
+    await api.send(id, text, seen);
     const card = cardById(id);
     if (card) {
       card.phase = 'gone';
@@ -450,7 +458,7 @@ async function commitSchedule(card: CardState): Promise<void> {
   card.schedBusy = true;
   render();
   try {
-    await api.schedule(card.id, card.text, at);
+    await api.schedule(card.id, card.text, at, card.data.newer?.id ?? null);
     card.phase = 'gone';
     showToast(`Programado para ${saleLabel(at)}.`);
     renderer.announce(`Programado para ${saleLabel(at)}.`);

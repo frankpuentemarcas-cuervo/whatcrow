@@ -13,6 +13,8 @@ pub enum ActionError {
     PastSchedule,
     #[error("este envío ya no se puede reintentar")]
     NotRetryable,
+    #[error("llegó un mensaje nuevo: revisalo antes de enviar")]
+    Stale,
     #[error(transparent)]
     Db(#[from] DbError),
     #[error("error de la base: {0}")]
@@ -26,8 +28,16 @@ impl serde::Serialize for ActionError {
 }
 
 impl Db {
-    pub fn send(&mut self, suggestion_id: i64, text: &str, now: i64) -> Result<i64, ActionError> {
-        self.enqueue(suggestion_id, text, None, now)
+    /// `seen`: id del último mensaje entrante que el usuario tenía a la vista al aprobar
+    /// ("Enviar igual" sobre una desactualizada). `None` = el ancla de la sugerencia.
+    pub fn send(
+        &mut self,
+        suggestion_id: i64,
+        text: &str,
+        seen: Option<&str>,
+        now: i64,
+    ) -> Result<i64, ActionError> {
+        self.enqueue(suggestion_id, text, None, seen, now)
     }
 
     pub fn schedule(
@@ -35,20 +45,23 @@ impl Db {
         suggestion_id: i64,
         text: &str,
         send_at: i64,
+        seen: Option<&str>,
         now: i64,
     ) -> Result<i64, ActionError> {
         if send_at <= now {
             return Err(ActionError::PastSchedule);
         }
-        self.enqueue(suggestion_id, text, Some(send_at), now)
+        self.enqueue(suggestion_id, text, Some(send_at), seen, now)
     }
 
     /// Spec §7: UPDATE condicionado + INSERT en una sola transacción; 0 filas = no se inserta nada.
+    /// También rechaza si entró un mensaje que el usuario no vio (por ejemplo, durante los 5 s de deshacer).
     fn enqueue(
         &mut self,
         suggestion_id: i64,
         text: &str,
         send_at: Option<i64>,
+        seen: Option<&str>,
         now: i64,
     ) -> Result<i64, ActionError> {
         let text = text.trim();
@@ -58,16 +71,26 @@ impl Db {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let row: Option<(String, String)> = tx
+        let row: Option<(String, String, String)> = tx
             .query_row(
-                "SELECT chat_jid, category FROM suggestions WHERE id = ?1 AND status = 'pending'",
+                "SELECT chat_jid, category, last_msg_id FROM suggestions WHERE id = ?1 AND status = 'pending'",
                 params![suggestion_id],
-                |r| Ok((r.get(0)?, r.get(1)?)),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()?;
-        let (chat_jid, category) = row.ok_or(ActionError::NotPending)?;
+        let (chat_jid, category, anchor) = row.ok_or(ActionError::NotPending)?;
         if category != "respuesta" {
             return Err(ActionError::NotSendable);
+        }
+        let latest: Option<String> = tx
+            .query_row(
+                "SELECT id FROM messages WHERE chat_jid = ?1 AND from_me = 0 ORDER BY ts DESC LIMIT 1",
+                params![chat_jid],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if latest.is_some_and(|id| id != seen.unwrap_or(&anchor)) {
+            return Err(ActionError::Stale);
         }
         let next = if send_at.is_some() {
             "scheduled"

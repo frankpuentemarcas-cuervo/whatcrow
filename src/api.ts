@@ -57,10 +57,13 @@ export interface Config {
 
 export const snapshot = (): Promise<Snapshot> => invoke('snapshot');
 
-export const send = (id: number, text: string): Promise<number> => invoke('send', { id, text });
+// `seen`: id del mensaje entrante más nuevo que el usuario tenía a la vista ("Enviar igual").
+// null = el ancla de la sugerencia. Rust rechaza si entró otro después (error "llegó un mensaje nuevo").
+export const send = (id: number, text: string, seen: string | null = null): Promise<number> =>
+  invoke('send', { id, text, seen });
 
-export const schedule = (id: number, text: string, sendAt: number): Promise<number> =>
-  invoke('schedule', { id, text, sendAt });
+export const schedule = (id: number, text: string, sendAt: number, seen: string | null = null): Promise<number> =>
+  invoke('schedule', { id, text, sendAt, seen });
 
 export const dismiss = (id: number): Promise<void> => invoke('dismiss', { id });
 

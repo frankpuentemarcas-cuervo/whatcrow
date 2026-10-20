@@ -70,8 +70,13 @@ pub fn snapshot(state: State<'_, AppState>) -> Result<Snapshot, String> {
 }
 
 #[tauri::command]
-pub fn send(state: State<'_, AppState>, id: i64, text: String) -> Result<i64, ActionError> {
-    state.with_db(|db| db.send(id, &text, ahora_ms()))
+pub fn send(
+    state: State<'_, AppState>,
+    id: i64,
+    text: String,
+    seen: Option<String>,
+) -> Result<i64, ActionError> {
+    state.with_db(|db| db.send(id, &text, seen.as_deref(), ahora_ms()))
 }
 
 #[tauri::command]
@@ -80,8 +85,9 @@ pub fn schedule(
     id: i64,
     text: String,
     send_at: i64,
+    seen: Option<String>,
 ) -> Result<i64, ActionError> {
-    state.with_db(|db| db.schedule(id, &text, send_at, ahora_ms()))
+    state.with_db(|db| db.schedule(id, &text, send_at, seen.as_deref(), ahora_ms()))
 }
 
 #[tauri::command]
