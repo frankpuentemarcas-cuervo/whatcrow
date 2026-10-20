@@ -389,7 +389,7 @@ export class Renderer {
   private emptyDetail(s: AppViewState): string {
     const at = s.health?.agentLastAt;
     if (!at) return 'La próxima sugerencia aparece acá en cuanto el agente haga su vuelta.';
-    return `El agente revisó a las ${clock(at)}; la próxima vuelta es cerca de las ${clock(at + 600_000)}.`;
+    return `El agente revisó a las ${clock(at)}; la próxima vuelta es cerca de las ${clock(at + 300_000)}.`;
   }
 
   private renderDetail(s: AppViewState): void {

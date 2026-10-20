@@ -9,15 +9,19 @@ export class UndoQueue {
 
   constructor(private readonly setTimer: SetT = setTimeout, private readonly clearTimer: ClearT = clearTimeout) {}
 
+  // Los timers se llaman sueltos, nunca como this.setTimer(...): en el WebView, setTimeout con un
+  // this que no es window lanza "Illegal invocation" y Enviar quedaba pegado en "en 0 s".
   start(key: string, commit: () => void): void {
     if (this.timers.has(key)) return;
-    this.timers.set(key, this.setTimer(() => { this.timers.delete(key); commit(); }, UNDO_MS));
+    const set = this.setTimer;
+    this.timers.set(key, set(() => { this.timers.delete(key); commit(); }, UNDO_MS));
   }
 
   cancel(key: string): boolean {
     const t = this.timers.get(key);
     if (t === undefined) return false;
-    this.clearTimer(t);
+    const clear = this.clearTimer;
+    clear(t);
     this.timers.delete(key);
     return true;
   }
