@@ -53,9 +53,12 @@ impl Db {
     fn pending(&self) -> Result<Vec<SuggestionView>, DbError> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.chat_jid, COALESCE(s.chat_name, c.name, s.chat_jid), s.chat_jid LIKE '%@g.us', s.last_msg_text,
-                    s.draft, s.category, s.note, s.created_at, s.updated_at, s.last_msg_id
+                    s.draft, s.category, s.note, s.created_at, s.updated_at, s.last_msg_id,
+                    (SELECT m.ts FROM messages m WHERE m.chat_jid = s.chat_jid AND m.id = s.last_msg_id) AS anchor_ts
              FROM suggestions s LEFT JOIN chats c ON c.jid = s.chat_jid
-             WHERE s.status = 'pending' ORDER BY s.updated_at DESC, s.id DESC",
+             WHERE s.status = 'pending'
+             -- La conversación más reciente primero (pedido de Erick): último entrante del chat, no la hora de la sugerencia.
+             ORDER BY COALESCE((SELECT MAX(m.ts) FROM messages m WHERE m.chat_jid = s.chat_jid AND m.from_me = 0), anchor_ts, s.updated_at) DESC, s.id DESC",
         )?;
         let rows = stmt
             .query_map([], |r| {
@@ -71,6 +74,7 @@ impl Db {
                         note: r.get(7)?,
                         created_at: r.get(8)?,
                         updated_at: r.get(9)?,
+                        last_msg_at: r.get(11)?,
                         newer: None,
                     },
                     r.get::<_, String>(10)?,

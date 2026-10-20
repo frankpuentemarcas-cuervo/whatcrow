@@ -136,3 +136,22 @@ fn snapshot_calcula_salud_del_daemon_y_del_agente() {
             .daemon_healthy
     );
 }
+
+#[test]
+fn snapshot_ordena_por_el_ultimo_mensaje_entrante_no_por_la_sugerencia() {
+    let f = Fixture::new();
+    // Chat viejo con sugerencia recién creada (barrido) y chat reciente con sugerencia vieja.
+    f.message(JUAN, "J1", false, "viejo", NOW - 5 * 86_400_000);
+    f.message(ANA, "A1", false, "reciente", NOW - 60_000);
+    let viejo = f.suggestion(JUAN, "J1", "respuesta", Some("x"), "pending");
+    let reciente = f.suggestion(ANA, "A1", "respuesta", Some("y"), "pending");
+    f.conn().execute("UPDATE suggestions SET updated_at = ?1 WHERE id = ?2", rusqlite::params![NOW, viejo]).unwrap();
+    f.conn().execute("UPDATE suggestions SET updated_at = ?1 WHERE id = ?2", rusqlite::params![NOW - 3_600_000, reciente]).unwrap();
+    let s = Db::open(&f.path).unwrap().snapshot(NOW).unwrap();
+    assert_eq!(s.pending.iter().map(|p| p.id).collect::<Vec<_>>(), vec![reciente, viejo]);
+    assert_eq!(s.pending[0].last_msg_at, Some(NOW - 60_000));
+    // Un mensaje nuevo en el chat viejo lo sube arriba.
+    f.message(JUAN, "J2", false, "¿hola?", NOW - 1_000);
+    let s = Db::open(&f.path).unwrap().snapshot(NOW).unwrap();
+    assert_eq!(s.pending[0].id, viejo);
+}

@@ -611,7 +611,7 @@ export class Renderer {
     const label = CAT_LABEL[view.category] ?? view.category;
     const stale = !!view.newer;
     const response = view.category === 'respuesta';
-    const time = clock(timeOf(view));
+    const time = clock(view.lastMsgAt ?? timeOf(view));
     const description = `${label}${stale ? ', desactualizada' : ''}, id ${view.id}, ${time}`;
     const fresh = card.replaced && s.now - card.replaced.at < 10_000;
     const replaced = fresh

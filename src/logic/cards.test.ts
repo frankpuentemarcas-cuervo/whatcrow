@@ -17,6 +17,7 @@ const view = (id: number, chatJid: string, draft: string | null): SuggestionView
   note: null,
   createdAt: 1,
   updatedAt: 2,
+  lastMsgAt: null,
   newer: null,
 });
 

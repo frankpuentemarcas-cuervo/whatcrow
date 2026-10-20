@@ -25,6 +25,8 @@ pub struct SuggestionView {
     pub note: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Hora del mensaje que contesta la sugerencia (el ancla); es la que muestra la tarjeta.
+    pub last_msg_at: Option<i64>,
     pub newer: Option<NewerMessage>,
 }
 

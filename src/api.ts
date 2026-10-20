@@ -18,6 +18,8 @@ export interface SuggestionView {
   note: string | null;
   createdAt: number;
   updatedAt: number;
+  // Hora del mensaje que contesta la sugerencia (ancla); la tarjeta muestra esta, no la de la sugerencia.
+  lastMsgAt: number | null;
   newer: NewerMessage | null;
 }
 
