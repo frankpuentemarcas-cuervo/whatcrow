@@ -30,6 +30,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": [
       "nsis"
     ],
@@ -43,7 +44,14 @@
   },
   "plugins": {
     "updater": {
-      "requireSignedVersion": true
+      "requireSignedVersion": true,
+      "pubkey": "REEMPLAZAR_EN_TASK_7",
+      "endpoints": [
+        "https://github.com/frankpuentemarcas-cuervo/whatcrow/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
     }
   }
 }
