@@ -284,10 +284,10 @@ export class Renderer {
     const count = (filter: Filter): number =>
       live.filter((card) => filter === 'all' || card.data.category === filter).length;
     const options: Array<[Filter, string]> = [
-      ['all', 'Todas'],
       ['respuesta', 'Responder'],
       ['tarea', 'Tareas'],
       ['esperando', 'Esperando'],
+      ['all', 'Todas'],
     ];
     this.filters.innerHTML = options
       .map(
@@ -372,16 +372,18 @@ export class Renderer {
       if (!wanted.has(Number(li.dataset.cardId))) li.remove();
     }
 
-    for (const card of visible) {
+    // Solo se mueven los nodos que quedaron fuera de orden: re-insertar todos en cada render
+    // confundía el scroll anchoring de Chromium y el clic en una tarjeta devolvía la lista arriba.
+    visible.forEach((card, index) => {
       let li = list.querySelector<HTMLLIElement>(`li[data-card-id="${card.id}"]`);
       if (!li) {
         li = this.doc.createElement('li');
         li.dataset.cardId = String(card.id);
-        list.appendChild(li);
       }
+      const expected = list.children[index] ?? null;
+      if (li !== expected) list.insertBefore(li, expected);
       this.paintCard(li, card, s, 'l');
-      list.appendChild(li);
-    }
+    });
   }
 
   private emptyDetail(s: AppViewState): string {

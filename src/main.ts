@@ -44,7 +44,8 @@ const state: AppViewState = {
   loading: true,
   busy: false,
   tab: 'pending',
-  filter: 'all',
+  // Por defecto solo lo que espera respuesta de Erick; Tareas, Esperando y Todas quedan en los filtros.
+  filter: 'respuesta',
   selectedId: null,
   counterMode: false,
   toast: null,
@@ -218,8 +219,10 @@ function applySnapshot(snapshot: api.Snapshot): void {
     if (!failedIds.has(id)) state.retries.delete(id);
   }
 
-  if (state.selectedId === null || !state.cards.some((card) => card.id === state.selectedId && card.phase !== 'gone')) {
-    state.selectedId = state.cards.find((card) => card.phase !== 'gone')?.id ?? null;
+  // Con el filtro por defecto (Responder) la primera tarjeta viva puede ser una tarea oculta: elegir entre las visibles.
+  const visible = visibleCards();
+  if (state.selectedId === null || !visible.some((card) => card.id === state.selectedId)) {
+    state.selectedId = visible[0]?.id ?? null;
   }
 }
 
