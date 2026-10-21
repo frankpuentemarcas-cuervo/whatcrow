@@ -79,6 +79,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::snapshot,
+            commands::approve_learning_rule,
+            commands::reject_learning_rule,
             commands::send,
             commands::schedule,
             commands::dismiss,

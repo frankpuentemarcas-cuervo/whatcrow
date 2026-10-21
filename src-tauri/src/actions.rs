@@ -15,6 +15,8 @@ pub enum ActionError {
     NotRetryable,
     #[error("llegó un mensaje nuevo: revisalo antes de enviar")]
     Stale,
+    #[error("la propuesta de aprendizaje ya no está pendiente")]
+    LearningRuleNotPending,
     #[error(transparent)]
     Db(#[from] DbError),
     #[error("error de la base: {0}")]
@@ -182,5 +184,25 @@ impl Db {
         let id = tx.last_insert_rowid();
         tx.commit()?;
         Ok(id)
+    }
+
+    pub fn approve_learning_rule(&mut self, id: i64, now: i64) -> Result<(), ActionError> {
+        self.review_learning_rule(id, "approved", now)
+    }
+
+    pub fn reject_learning_rule(&mut self, id: i64, now: i64) -> Result<(), ActionError> {
+        self.review_learning_rule(id, "rejected", now)
+    }
+
+    fn review_learning_rule(&mut self, id: i64, status: &str, now: i64) -> Result<(), ActionError> {
+        let changed = self.conn.execute(
+            "UPDATE learning_rules SET status = ?1, updated_at = ?2, reviewed_at = ?2 WHERE id = ?3 AND status = 'pending'",
+            params![status, now, id],
+        )?;
+        if changed == 1 {
+            Ok(())
+        } else {
+            Err(ActionError::LearningRuleNotPending)
+        }
     }
 }

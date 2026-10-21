@@ -13,6 +13,7 @@ import {
   type Theme,
 } from './render';
 import { isPaused } from './logic/paused';
+import { createCoalescedTask } from './logic/coalesced-task';
 import { PRESETS, heightMode, widthMode } from './logic/layout';
 import { UndoQueue } from './logic/undo';
 import { formatId } from './logic/ids';
@@ -22,7 +23,7 @@ import { shortcutTarget } from './logic/target';
 
 const PRESET_KEYS = ['counter', 'compact', 'normal', 'wide'] as const;
 type PresetKey = (typeof PRESET_KEYS)[number];
-const TABS: Tab[] = ['pending', 'sched', 'failed'];
+const TABS: Tab[] = ['pending', 'learning', 'sched', 'failed'];
 const THEME_KEY = 'whatcrow:theme';
 
 const appWindow = getCurrentWindow();
@@ -31,6 +32,8 @@ const undo = new UndoQueue();
 
 const state: AppViewState = {
   cards: [],
+  learningRules: [],
+  reviewingLearningRuleIds: new Set(),
   scheduled: [],
   failed: [],
   retries: new Map(),
@@ -63,7 +66,6 @@ const state: AppViewState = {
   mode: { width: widthMode(window.innerWidth), height: heightMode(window.innerHeight) },
 };
 
-let polling = false;
 let lastRenderAt = 0;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastUndoFn: (() => void) | null = null;
@@ -155,9 +157,7 @@ function tick(): void {
   if (expired || transient || now - lastRenderAt >= 5_000) render();
 }
 
-async function poll(): Promise<void> {
-  if (polling) return;
-  polling = true;
+const poll = createCoalescedTask(async (): Promise<void> => {
   try {
     const snapshot = await api.snapshot();
     state.lastOkAt = Date.now();
@@ -177,13 +177,16 @@ async function poll(): Promise<void> {
       state.loadError = message;
     }
   } finally {
-    polling = false;
     render();
   }
-}
+});
 
 function applySnapshot(snapshot: api.Snapshot): void {
   state.health = snapshot.health;
+  state.learningRules = snapshot.learningRules;
+  for (const id of state.reviewingLearningRuleIds) {
+    if (!state.learningRules.some((rule) => rule.id === id)) state.reviewingLearningRuleIds.delete(id);
+  }
   state.readAt = snapshot.readAt;
   state.scheduled = snapshot.scheduled;
   state.failed = snapshot.failed;
@@ -872,11 +875,36 @@ async function copyCommand(): Promise<void> {
   }
 }
 
+async function reviewLearningRule(id: number, approve: boolean): Promise<void> {
+  if (state.reviewingLearningRuleIds.has(id)) return;
+  state.reviewingLearningRuleIds.add(id);
+  renderer.announce(`${approve ? 'Aprobando' : 'Rechazando'} candidata de aprendizaje #${id}.`);
+  render();
+  try {
+    if (approve) await api.approveLearningRule(id);
+    else await api.rejectLearningRule(id);
+    showToast(approve ? 'Regla aprobada.' : 'Candidata rechazada.');
+    // applySnapshot libera el bloqueo cuando la candidata deja de estar pendiente.
+    void poll();
+  } catch (error) {
+    state.reviewingLearningRuleIds.delete(id);
+    showToast(errorText(error));
+    render();
+  }
+}
+
 function handleAction(action: string, element: HTMLElement): void {
   const card = currentCard(element);
   const id = outboxId(element);
+  const ruleId = Number(element.dataset.ruleId);
 
   switch (action) {
+    case 'approve-learning':
+      if (Number.isInteger(ruleId)) void reviewLearningRule(ruleId, true);
+      break;
+    case 'reject-learning':
+      if (Number.isInteger(ruleId)) void reviewLearningRule(ruleId, false);
+      break;
     case 'open-settings':
       openSettings();
       break;

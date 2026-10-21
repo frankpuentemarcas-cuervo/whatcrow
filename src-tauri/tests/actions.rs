@@ -170,12 +170,58 @@ fn send_rechaza_si_llego_un_mensaje_entrante_que_el_usuario_no_vio() {
     let id = f.suggestion(JUAN, "J1", "respuesta", Some("Sí"), "pending");
     f.message(JUAN, "J2", false, "¿y entonces?", NOW - 1_000);
     let mut db = Db::open(&f.path).unwrap();
-    assert!(matches!(db.send(id, "Sí", None, NOW), Err(ActionError::Stale)));
+    assert!(matches!(
+        db.send(id, "Sí", None, NOW),
+        Err(ActionError::Stale)
+    ));
     assert!(outbox(&f).is_empty());
     assert_eq!(status(&f, id).0, "pending");
     // "Enviar igual" sobre el mensaje que el usuario sí vio.
     db.send(id, "Sí", Some("J2"), NOW).unwrap();
     assert_eq!(status(&f, id).0, "sent");
+}
+
+#[test]
+fn aprobar_o_rechazar_aprendizaje_solo_revisa_candidatas_pendientes() {
+    let f = Fixture::new();
+    let c = f.conn();
+    let insert = "INSERT INTO learning_rules (source_suggestion_id, chat_jid, scope, rule_text, rationale, status, created_at, updated_at) VALUES (?1, ?2, 'global', ?3, 'motivo', 'pending', ?4, ?4)";
+    c.execute(
+        insert,
+        params![7, JUAN, "Prefiere respuestas directas.", NOW],
+    )
+    .unwrap();
+    c.execute(insert, params![8, ANA, "Usa frases breves.", NOW])
+        .unwrap();
+    let mut db = Db::open(&f.path).unwrap();
+
+    db.approve_learning_rule(1, NOW + 1).unwrap();
+    db.reject_learning_rule(2, NOW + 2).unwrap();
+
+    let c = f.conn();
+    assert_eq!(
+        c.query_row(
+            "SELECT status, reviewed_at FROM learning_rules WHERE id = 1",
+            [],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        )
+        .unwrap(),
+        ("approved".to_string(), NOW + 1),
+    );
+    assert_eq!(
+        c.query_row(
+            "SELECT status, reviewed_at FROM learning_rules WHERE id = 2",
+            [],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        )
+        .unwrap(),
+        ("rejected".to_string(), NOW + 2),
+    );
+    assert!(outbox(&f).is_empty());
+    assert!(matches!(
+        db.approve_learning_rule(1, NOW + 3),
+        Err(ActionError::LearningRuleNotPending)
+    ));
 }
 
 #[test]
@@ -186,7 +232,10 @@ fn send_con_visto_viejo_tambien_se_rechaza_si_llego_otro_mas() {
     f.message(JUAN, "J2", false, "¿y entonces?", NOW - 2_000);
     f.message(JUAN, "J3", false, "???", NOW - 1_000);
     let mut db = Db::open(&f.path).unwrap();
-    assert!(matches!(db.schedule(id, "Sí", NOW + 60_000, Some("J2"), NOW), Err(ActionError::Stale)));
+    assert!(matches!(
+        db.schedule(id, "Sí", NOW + 60_000, Some("J2"), NOW),
+        Err(ActionError::Stale)
+    ));
     assert!(outbox(&f).is_empty());
 }
 

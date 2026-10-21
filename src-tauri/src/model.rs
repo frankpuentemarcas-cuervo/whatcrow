@@ -4,6 +4,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
+    pub learning_rules: Vec<LearningRuleView>,
     pub pending: Vec<SuggestionView>,
     pub scheduled: Vec<OutboxView>,
     pub failed: Vec<OutboxView>,
@@ -63,4 +64,17 @@ pub struct Health {
     pub daemon_healthy: bool,
     pub agent_last_at: Option<i64>,
     pub agent_healthy: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearningRuleView {
+    pub id: i64,
+    pub source_suggestion_id: i64,
+    pub chat_jid: Option<String>,
+    pub scope: String,
+    pub rule_text: String,
+    pub rationale: String,
+    pub created_at: i64,
+    pub updated_at: i64,
 }

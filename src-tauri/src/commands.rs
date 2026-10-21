@@ -143,3 +143,12 @@ pub fn save_window_size(state: State<'_, AppState>, width: f64, height: f64) -> 
     *current = updated;
     Ok(())
 }
+
+#[tauri::command]
+pub fn approve_learning_rule(state: State<'_, AppState>, id: i64) -> Result<(), ActionError> {
+    state.with_db(|db| db.approve_learning_rule(id, ahora_ms()))
+}
+#[tauri::command]
+pub fn reject_learning_rule(state: State<'_, AppState>, id: i64) -> Result<(), ActionError> {
+    state.with_db(|db| db.reject_learning_rule(id, ahora_ms()))
+}
