@@ -43,7 +43,10 @@ export interface Health {
   agentHealthy: boolean;
 }
 
+export interface LearningRuleView { id: number; sourceSuggestionId: number; chatJid: string | null; scope: string; ruleText: string; rationale: string; createdAt: number; updatedAt: number; }
+
 export interface Snapshot {
+  learningRules: LearningRuleView[];
   pending: SuggestionView[];
   scheduled: OutboxView[];
   failed: OutboxView[];
@@ -58,6 +61,8 @@ export interface Config {
 }
 
 export const snapshot = (): Promise<Snapshot> => invoke('snapshot');
+export const approveLearningRule = (id: number): Promise<void> => invoke('approve_learning_rule', { id });
+export const rejectLearningRule = (id: number): Promise<void> => invoke('reject_learning_rule', { id });
 
 // `seen`: id del mensaje entrante más nuevo que el usuario tenía a la vista ("Enviar igual").
 // null = el ancla de la sugerencia. Rust rechaza si entró otro después (error "llegó un mensaje nuevo").

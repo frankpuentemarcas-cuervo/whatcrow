@@ -4,7 +4,7 @@ import { clock, clockSeconds, fromInputs, isoDate, isoTime, relativeAgo, saleLab
 import { UNDO_MS } from './logic/undo';
 import type { HeightMode, WidthMode } from './logic/layout';
 
-export type Tab = 'pending' | 'sched' | 'failed';
+export type Tab = 'pending' | 'learning' | 'sched' | 'failed';
 export type Filter = 'all' | 'respuesta' | 'tarea' | 'esperando';
 export type Theme = 'system' | 'light' | 'dark';
 export type CardPhase = 'idle' | 'sending' | 'schedule' | 'leaving' | 'gone';
@@ -65,6 +65,8 @@ export interface SettingsView {
 
 export interface AppViewState {
   cards: CardState[];
+  learningRules: import('./api').LearningRuleView[];
+  reviewingLearningRuleIds: Set<number>;
   scheduled: OutboxView[];
   failed: OutboxView[];
   /** outbox id -> instante en que empezó la cuenta de Reintentar. */
@@ -197,7 +199,7 @@ export class Renderer {
     this.renderBanners(s);
     this.renderTabs(s);
     this.renderFilters(s);
-    this.renderPending(s);
+    if (s.tab === 'learning') this.renderLearning(s); else this.renderPending(s);
     this.renderDetail(s);
     this.renderSide(s);
     this.renderStatus(s);
@@ -405,7 +407,32 @@ export class Renderer {
     this.paintCard(this.colDetail, selected, s, 'd');
   }
 
+  private renderLearning(s: AppViewState): void {
+    this.filters.innerHTML = '';
+    this.colDetail.innerHTML = '';
+    if (s.loading || s.dbMissing) {
+      this.listSig = '';
+      this.colList.innerHTML = s.dbMissing
+        ? `<div class="empty" role="alert"><h2>No encuentro la base de datos.</h2><p>Revisa la ruta o vuelve a intentarlo desde el aviso superior.</p><p class="path">${esc(s.dbPath)}</p></div>`
+        : '<div class="empty" aria-busy="true">Cargando…</div>';
+      return;
+    }
+    this.colList.innerHTML = s.learningRules.length
+      ? `<ul class="list learning-list">${s.learningRules.map((r) => {
+          const busy = s.reviewingLearningRuleIds.has(r.id);
+          const disabled = busy ? ' disabled aria-busy="true"' : '';
+          const pendingLabel = busy ? 'Guardando…' : '';
+          return `<li class="learning-rule"><strong>${esc(r.ruleText)}</strong><p>${esc(r.rationale)}</p><small>${r.scope === 'global' ? 'Global' : `Contacto · ${esc(r.chatJid ?? '')}`} · Propuesta #${r.sourceSuggestionId}</small><div class="acts"><button class="btn primary" data-act="approve-learning" data-rule-id="${r.id}"${disabled}>${pendingLabel || 'Aprobar'}</button><button class="btn" data-act="reject-learning" data-rule-id="${r.id}"${disabled}>${pendingLabel || 'Rechazar'}</button></div></li>`;
+        }).join('')}</ul>`
+      : '<div class="empty"><h2>Sin candidatas pendientes.</h2></div>';
+  }
+
   private renderSide(s: AppViewState): void {
+    if (s.loading || s.dbMissing) {
+      this.sideSig = '';
+      this.colSide.innerHTML = '';
+      return;
+    }
     const sig = this.outboxSignature('side', s);
     if (sig !== this.sideSig) {
       this.sideSig = sig;
