@@ -30,7 +30,9 @@ impl Db {
         )?;
         conn.busy_timeout(std::time::Duration::from_millis(5000))?;
         // WhatCrow puede arrancar antes que el daemon; crear únicamente esta tabla es idempotente.
-        conn.execute_batch("CREATE TABLE IF NOT EXISTS learning_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, source_suggestion_id INTEGER NOT NULL UNIQUE, chat_jid TEXT, scope TEXT NOT NULL CHECK(scope IN ('global','contact')), rule_text TEXT NOT NULL CHECK(length(rule_text) BETWEEN 1 AND 500), rationale TEXT NOT NULL CHECK(length(rationale) BETWEEN 1 AND 500), status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','disabled')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, reviewed_at INTEGER)")?;
+        conn.execute_batch("CREATE TABLE IF NOT EXISTS learning_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, source_suggestion_id INTEGER NOT NULL UNIQUE, chat_jid TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope IN ('global','contact')), rule_text TEXT NOT NULL CHECK(length(trim(rule_text)) BETWEEN 1 AND 500), rationale TEXT NOT NULL CHECK(length(trim(rationale)) BETWEEN 1 AND 500), status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','disabled')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, reviewed_at INTEGER);
+CREATE INDEX IF NOT EXISTS idx_learning_rules_pending ON learning_rules(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_learning_rules_scope ON learning_rules(status, scope, chat_jid, reviewed_at DESC);")?;
         Ok(Db { conn })
     }
 

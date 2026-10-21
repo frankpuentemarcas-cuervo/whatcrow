@@ -98,4 +98,6 @@ CREATE INDEX idx_messages_chat_ts ON messages (chat_jid, ts);
 
 CREATE UNIQUE INDEX idx_suggestions_one_pending ON suggestions (chat_jid) WHERE status = 'pending';
 
-CREATE TABLE learning_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, source_suggestion_id INTEGER NOT NULL UNIQUE, chat_jid TEXT, scope TEXT NOT NULL CHECK(scope IN ('global','contact')), rule_text TEXT NOT NULL CHECK(length(rule_text) BETWEEN 1 AND 500), rationale TEXT NOT NULL CHECK(length(rationale) BETWEEN 1 AND 500), status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','disabled')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, reviewed_at INTEGER);
+CREATE TABLE IF NOT EXISTS learning_rules (id INTEGER PRIMARY KEY AUTOINCREMENT, source_suggestion_id INTEGER NOT NULL UNIQUE, chat_jid TEXT NOT NULL, scope TEXT NOT NULL CHECK(scope IN ('global','contact')), rule_text TEXT NOT NULL CHECK(length(trim(rule_text)) BETWEEN 1 AND 500), rationale TEXT NOT NULL CHECK(length(trim(rationale)) BETWEEN 1 AND 500), status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected','disabled')), created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, reviewed_at INTEGER);
+CREATE INDEX IF NOT EXISTS idx_learning_rules_pending ON learning_rules(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_learning_rules_scope ON learning_rules(status, scope, chat_jid, reviewed_at DESC);

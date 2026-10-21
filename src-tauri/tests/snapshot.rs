@@ -173,7 +173,7 @@ fn snapshot_ordena_por_el_ultimo_mensaje_entrante_no_por_la_sugerencia() {
 fn snapshot_expone_solo_reglas_pendientes_con_procedencia_y_scope() {
     let f = Fixture::new();
     let c = f.conn();
-    c.execute("INSERT INTO learning_rules(source_suggestion_id,chat_jid,scope,rule_text,rationale,status,created_at,updated_at) VALUES(10,NULL,'global','Respuestas breves','Preferencia explícita','pending',1,2)",[]).unwrap();
+    c.execute("INSERT INTO learning_rules(source_suggestion_id,chat_jid,scope,rule_text,rationale,status,created_at,updated_at) VALUES(10,?1,'global','Respuestas breves','Preferencia explícita','pending',1,2)",[JUAN]).unwrap();
     c.execute("INSERT INTO learning_rules(source_suggestion_id,chat_jid,scope,rule_text,rationale,status,created_at,updated_at) VALUES(11,?1,'contact','Tono cordial','Contexto conversacional','approved',1,2)",[JUAN]).unwrap();
     let rules = Db::open(&f.path)
         .unwrap()
@@ -184,6 +184,24 @@ fn snapshot_expone_solo_reglas_pendientes_con_procedencia_y_scope() {
     assert_eq!(rules[0].source_suggestion_id, 10);
     assert_eq!(rules[0].scope, "global");
     assert_eq!(rules[0].rationale, "Preferencia explícita");
+}
+
+#[test]
+fn abrir_recrea_learning_rules_con_esquema_canonico_si_falta() {
+    let f = Fixture::new();
+    f.conn().execute_batch("DROP TABLE learning_rules;").unwrap();
+    let _db = Db::open(&f.path).unwrap();
+    let c = f.conn();
+    let not_null: i64 = c.query_row("SELECT \"notnull\" FROM pragma_table_info('learning_rules') WHERE name='chat_jid'", [], |r| r.get(0)).unwrap();
+    assert_eq!(not_null, 1);
+    let base = "INSERT INTO learning_rules(source_suggestion_id,chat_jid,scope,rule_text,rationale,created_at,updated_at) VALUES(?1,?2,'global',?3,?4,1,1)";
+    assert!(c.execute(base, rusqlite::params![1, JUAN, "ok", "ok"]).is_ok());
+    assert!(c.execute(base, rusqlite::params![2, JUAN, "   ", "ok"]).is_err());
+    assert!(c.execute(base, rusqlite::params![3, JUAN, "ok", "   "]).is_err());
+    for name in ["idx_learning_rules_pending", "idx_learning_rules_scope"] {
+        let found: i64 = c.query_row("SELECT count(*) FROM sqlite_master WHERE type='index' AND name=?1", [name], |r| r.get(0)).unwrap();
+        assert_eq!(found, 1, "missing index {name}");
+    }
 }
 
 #[test]
